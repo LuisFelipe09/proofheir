@@ -35,7 +35,7 @@ proofheir/
 ├── apps/
 │   ├── web/            # Next.js (Dashboard & EIP-7702 signing logic)
 │   └── api/            # Rust API (Orchestrates TLSN + Noir Proofs)
-├── libs/
+├── packages/
 │   ├── circuits/       # Noir ZK-circuits (Inheritance conditions)
 │   ├── contracts/      # Foundry (Vaults & ZK Verifiers)
 │   └── notary/    # Shared Rust lib for TLSN Prover logic
