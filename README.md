@@ -1,33 +1,54 @@
-# Proofheir
+# 📜 ProofHeir
 
-<a alt="Nx logo" href="https://nx.dev" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="45"></a>
+**ProofHeir** is a decentralized, privacy-preserving inheritance protocol. It allows users to secure the future of their digital assets by automating transfers based on real-world web activity (via **TLSNotary**) and privacy-centric proofs (via **Noir ZK**), leveraging the power of **EIP-7702**.
+---
 
-✨ Your new, shiny [Nx workspace](https://nx.dev) is almost ready ✨.
+## 🚀 The Vision
 
-[Learn more about this workspace setup and its capabilities](https://nx.dev/getting-started/intro#learn-nx?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
+Traditional crypto inheritance relies on sharing private keys (insecure) or centralized custodians (defeats the purpose of crypto). **ProofHeir** creates a "Dead Man's Switch" that:
+1.  **Proves Inactivity:** Uses TLSNotary to verify the last time you logged into a web service (Gmail, Banking, etc.).
+2.  **Protects Privacy:** Uses Noir ZK-Proofs to prove you've been inactive for $X$ months without revealing your email or sensitive metadata.
+3.  **Executes Seamlessly:** Uses EIP-7702 to allow an EOA to delegate transfer power to our inheritance vault only when the proof is valid.
 
-## Finish your remote caching setup
+---
 
-[Click here to finish setting up your workspace!](https://cloud.nx.app/connect/ffHI2D7i5Z)
+## 🛠 Tech Stack
 
+| Layer | Technology |
+| :--- | :--- |
+| **Blockchain** | Mantle Network (L2) |
+| **Account Abstraction** | EIP-7702 (EOA Delegation) |
+| **Web Attestation** | [TLSNotary](https://tlsnotary.org/) (Rust) |
+| **ZK-Circuits** | [Noir](https://noir-lang.org/) |
+| **Monorepo** | [Nx](https://nx.dev/) |
+| **Backend** | Rust (Axum API) |
+| **Frontend** | Next.js + Tailwind + Viem |
 
-## Run tasks
+---
 
-To run tasks with Nx use:
+## 🏗 Project Structure
 
-```sh
-npx nx <target> <project-name>
+This project is managed as an **Nx Integrated Monorepo** for seamless polyglot development:
+
+```text
+proofheir/
+├── apps/
+│   ├── web/            # Next.js (Dashboard & EIP-7702 signing logic)
+│   └── api/            # Rust API (Orchestrates TLSN + Noir Proofs)
+├── libs/
+│   ├── circuits/       # Noir ZK-circuits (Inheritance conditions)
+│   ├── contracts/      # Foundry (Vaults & ZK Verifiers)
+│   └── notary/    # Shared Rust lib for TLSN Prover logic
+├── nx.json             # Monorepo orchestration
+└── Cargo.toml          # Rust Workspace root
 ```
 
-For example:
+##  ⚙️ How It Works
+**1. Proof of Life (Setup & Delegation):**
+The account owner establishes their "Proof of Life" by actively signing an **EIP-7702** delegation. This registers the inheritance rules and designates the heir's account, ensuring control remains with the owner while they are active.
 
-```sh
-npx nx build myproject
-```
-
-These targets are either [inferred automatically](https://nx.dev/concepts/inferred-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or defined in the `project.json` or `package.json` files.
-
-[More about running tasks in the docs &raquo;](https://nx.dev/features/run-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+**2. Proof of Death (Execution):**
+To trigger inheritance, a valid "Proof of Death" is required. This is generated via **TLSNotary** (verifying inactivity or digital records) and **Noir** (creating a private ZK-proof). Once the ProofHeir Vault validates this proof, it executes the transfer of assets to the heir.
 
 ## Add new projects
 

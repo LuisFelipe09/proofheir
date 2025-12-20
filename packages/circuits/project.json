@@ -1,0 +1,28 @@
+{
+  "name": "circuits",
+  "root": "packages/circuits",
+  "projectType": "library",
+  "targets": {
+    "compile": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "nargo compile",
+        "cwd": "packages/circuits"
+      }
+    },
+    "verify-contract": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "nargo codegen-verifier",
+        "cwd": "packages/circuits"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "nargo test",
+        "cwd": "packages/circuits"
+      }
+    }
+  }
+}

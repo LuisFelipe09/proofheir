@@ -1,0 +1,10 @@
+[workspace]
+members = [
+    "packages/notary",
+]
+resolver = "2"
+
+[workspace.dependencies]
+# Aquí centralizaremos versiones de tlsn, tokio, etc.
+tlsn-core = "0.1.0-alpha.13" 
+tokio = { version = "1", features = ["full"] }

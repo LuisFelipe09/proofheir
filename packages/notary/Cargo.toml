@@ -1,0 +1,12 @@
+[package]
+name = "notary"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+# Ahora solo necesitas el crate 'tlsn' que lo contiene todo
+tlsn = { git = "https://github.com/tlsnotary/tlsn", tag = "v0.1.0-alpha.13" }
+# Para la parte de atestiguación (si vas a generar pruebas persistentes)
+tlsn-formats = { git = "https://github.com/tlsnotary/tlsn", tag = "v0.1.0-alpha.13" }
+tokio = { version = "1", features = ["full"] }
+eyre = "0.6"
