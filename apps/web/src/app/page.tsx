@@ -1,5 +1,6 @@
 import { WalletConnect } from '../components/WalletConnect';
 import { DelegationCard } from '../components/DelegationCard';
+import { ClaimCard } from '../components/ClaimCard';
 
 export default function Page() {
   return (
@@ -12,19 +13,49 @@ export default function Page() {
         <WalletConnect />
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-5xl">
-        <div className="text-center mb-12 max-w-2xl">
-          <h1 className="text-5xl font-extrabold mb-6 tracking-tight text-gray-900">
-            Secure Inheritance <br />
-            <span className="text-blue-600">Trustless & Private</span>
+      <main className="w-full max-w-6xl p-6 mx-auto">
+        <div className="text-center mb-12">
+          <h1 className="text-5xl font-extrabold mb-4 tracking-tight">
+            ProofHeir Protocol
           </h1>
-          <p className="text-lg text-gray-600 leading-relaxed">
-            Leverage EIP-7702 and Zero-Knowledge proofs to ensure your digital legacy
-            is passed on securely, without trusted intermediaries.
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Inheritance management powered by EIP-7702 and Zero-Knowledge Proofs.
           </p>
         </div>
 
-        <DelegationCard />
+        <div className="grid-2 mt-8 items-start">
+          {/* Columna Izquierda: Testador */}
+          <section className="card">
+            <div className="card-header-blue">
+              <h2 className="text-xl font-bold flex-row items-center">
+                <span className="step-number text-blue-600">1</span>
+                Testador (Dueño)
+              </h2>
+              <p className="text-blue-100 text-xs mt-1">
+                Configura tu herencia y delega permisos a través de EIP-7702.
+              </p>
+            </div>
+            <div className="card-body">
+              <DelegationCard />
+            </div>
+          </section>
+
+          {/* Columna Derecha: Heredero */}
+          <section className="card">
+            <div className="card-header-indigo">
+              <h2 className="text-xl font-bold flex-row items-center">
+                <span className="step-number text-indigo-600">2</span>
+                Heredero (Ejecutor)
+              </h2>
+              <p className="text-indigo-100 text-xs mt-1">
+                Ejecuta el reclamo de activos usando la autorización del Testador.
+              </p>
+            </div>
+            <div className="card-body">
+              <ClaimCard />
+            </div>
+          </section>
+        </div>
       </main>
 
       <footer className="p-6 text-gray-400 text-sm">

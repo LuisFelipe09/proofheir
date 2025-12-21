@@ -13,15 +13,20 @@ contract ProofHeir {
 
     IVerifier public immutable verifier;
 
-    event AssetsClaimed(address indexed claimer, address indexed recipient, address indexed token, uint256 amount);
+    event AssetsClaimed(address indexed heir, address indexed recipient, address token, uint256 amount);
 
     constructor(address _verifier) {
         verifier = IVerifier(_verifier);
     }
 
-    /// @notice Claim assets by providing a valid proof of death.
-    /// @dev This function is intended to be executed in the context of the Testator's EOA (via EIP-7702).
-    ///      The Heir (or anyone) calls this function on the Testator's address.
+    /**
+     * @notice Claims assets from the testator's account and transfers them to the recipient.
+     * @dev This function is intended to be called via EIP-7702 delegation.
+     * @param proof The ZK proof of the testator's condition (e.g., proof of death).
+     * @param publicInputs Public inputs for the ZK proof, publicInputs[0] MUST be the recipient address.
+     * @param tokens List of ERC20 tokens to transfer.
+     * @param recipient The address to receive the tokens.
+     */
     function claim(
         bytes calldata proof,
         bytes32[] calldata publicInputs,
@@ -29,6 +34,7 @@ contract ProofHeir {
         address recipient
     ) external {
         require(recipient != address(0), "Invalid recipient");
+        
         // Security: Ensure the recipient matches the one encoded in the proof (publicInputs[0])
         // This prevents front-running where an attacker changes the recipient address.
         require(publicInputs.length > 0, "Missing public inputs");
