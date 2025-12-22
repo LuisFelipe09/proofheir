@@ -27,7 +27,7 @@ export function ClaimCard() {
 
     const [testatorAddress, setTestatorAddress] = useState('')
     const [recipientAddress, setRecipientAddress] = useState('0x03f72d5859858AFF7b93096B4AD9593442DD2327')
-    const [tokenAddress, setTokenAddress] = useState('0x9a676e781a523b5d0c0e43731313a708cb607508')
+    const [tokenAddress, setTokenAddress] = useState('0x0165878A594ca255338adfa4d48449f69242Eb8F')
     const [authJson, setAuthJson] = useState('')
 
     const [status, setStatus] = useState<'idle' | 'executing' | 'success' | 'error'>('idle')
@@ -35,48 +35,43 @@ export function ClaimCard() {
     const [txHash, setTxHash] = useState<string | null>(null)
 
     const handleClaim = async () => {
-        if (!connectedAddress || !isConnected) {
-            setErrorMsg('Conecta tu wallet primero')
-            setStatus('error')
-            return
-        }
+        // Priorizar la embedded wallet de Privy para evitar MetaMask
+        const embeddedWallet = wallets.find(w => w.walletClientType === 'privy') || wallets.find(w => w.address === connectedAddress)
 
-        const privyWallet = wallets.find(w => w.address === connectedAddress)
-        if (!privyWallet) {
+        if (!embeddedWallet) {
             setErrorMsg('Wallet de Privy no encontrada')
             setStatus('error')
             return
         }
 
         try {
-            setStatus('executing')
-            setErrorMsg('')
 
-            let rawAuth;
-            try {
-                rawAuth = JSON.parse(authJson)
-            } catch (e) {
-                throw new Error('Formato de autorización inválido (JSON esperado)')
+            // Si hay un JSON de auth y NO está delegado, lo parseamos (lógica legacy, por si acaso)
+            let authorization
+            if (authJson && !authJson.trim().startsWith('{')) {
+                // Si no es JSON válido lo ignoramos
+            } else if (authJson) {
+                try {
+                    const rawAuth = JSON.parse(authJson)
+                    authorization = {
+                        address: (rawAuth.contractAddress || rawAuth.address) as Address,
+                        chainId: Number(rawAuth.chainId),
+                        nonce: Number(rawAuth.nonce || 0),
+                        r: rawAuth.r as Hex,
+                        s: rawAuth.s as Hex,
+                        yParity: Number(rawAuth.yParity ?? (rawAuth.v === 28 ? 1 : rawAuth.v === 27 ? 0 : (rawAuth.v ?? 0)))
+                    }
+                } catch (e) {
+                    console.warn("JSON de auth inválido, ignorando...", e)
+                }
             }
-
-            // Normalización de campos para EIP-7702
-            // 'address' es el campo clave para que el provider de Privy no falle y Anvil lo reconozca
-            const authorization = {
-                address: (rawAuth.contractAddress || rawAuth.address) as Address,
-                contractAddress: (rawAuth.contractAddress || rawAuth.address) as Address,
-                chainId: Number(rawAuth.chainId),
-                nonce: Number(rawAuth.nonce || 0),
-                r: rawAuth.r as Hex,
-                s: rawAuth.s as Hex,
-                yParity: Number(rawAuth.yParity ?? (rawAuth.v === 28 ? 1 : rawAuth.v === 27 ? 0 : (rawAuth.v ?? 0)))
-            }
-
-            console.log('🚀 Preparando reclamo Privy Native...')
 
             const proof = '0x' as Hex
             const recipient = (recipientAddress || connectedAddress) as Address
             const publicInputs = [pad(recipient, { size: 32 }) as Hex]
             const tokens = [tokenAddress as Address]
+
+            // Encode the function call
             const data = encodeFunctionData({
                 abi: PROOF_HEIR_ABI,
                 functionName: 'claim',
@@ -84,19 +79,25 @@ export function ClaimCard() {
             })
 
             // Hablamos directamente con el provider de la embedded wallet
-            const provider = await privyWallet.getEthereumProvider()
+            const provider = await embeddedWallet.getEthereumProvider()
+
+            // Transacción básica
+            const txParams: any = {
+                from: embeddedWallet.address,
+                to: testatorAddress,
+                data
+            }
+
+            // Solo agregamos authorizationList si realmente existe una autorización
+            if (authorization) {
+                txParams.authorizationList = [authorization]
+            }
 
             const hash = await provider.request({
                 method: 'eth_sendTransaction',
-                params: [{
-                    from: connectedAddress,
-                    to: testatorAddress,
-                    data,
-                    authorizationList: [authorization]
-                }]
+                params: [txParams]
             }) as string
 
-            console.log('✅ Éxito Native Hash:', hash)
             setTxHash(hash)
             setStatus('success')
         } catch (e: any) {
@@ -149,7 +150,7 @@ export function ClaimCard() {
 
             <button
                 onClick={handleClaim}
-                disabled={status === 'executing' || !testatorAddress || !authJson}
+                disabled={status === 'executing'}
                 style={{
                     width: '100%',
                     padding: '12px',
@@ -158,7 +159,7 @@ export function ClaimCard() {
                     color: 'white',
                     backgroundColor: status === 'success' ? '#16a34a' : status === 'error' ? '#dc2626' : '#4f46e5',
                     border: 'none',
-                    cursor: (status === 'executing' || !testatorAddress || !authJson) ? 'not-allowed' : 'pointer'
+                    cursor: (status === 'executing') ? 'not-allowed' : 'pointer'
                 }}
             >
                 {status === 'executing' ? 'Ejecutando...' : 'Confirmar y Ejecutar'}

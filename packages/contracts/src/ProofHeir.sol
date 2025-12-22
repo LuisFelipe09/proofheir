@@ -51,4 +51,14 @@ contract ProofHeir {
             }
         }
     }
+
+    /**
+     * @dev Allows the delegated account to receive native ETH.
+     */
+    receive() external payable {}
+
+    /**
+     * @dev Fallback function to handle calls with no matching function or data.
+     */
+    fallback() external payable {}
 }
