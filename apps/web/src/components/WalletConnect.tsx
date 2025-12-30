@@ -7,7 +7,11 @@ export function WalletConnect() {
 
     if (!ready) {
         return (
-            <div style={{ backgroundColor: '#f3f4f6', padding: '0.5rem', borderRadius: '0.5rem' }}>
+            <div
+                role="status"
+                aria-live="polite"
+                style={{ backgroundColor: '#f3f4f6', padding: '0.5rem', borderRadius: '0.5rem' }}
+            >
                 <div style={{ fontSize: '0.875rem' }}>Loading...</div>
             </div>
         )
@@ -27,6 +31,7 @@ export function WalletConnect() {
                 </div>
                 <button
                     onClick={logout}
+                    aria-label="Disconnect wallet"
                     style={{ backgroundColor: '#ef4444', color: 'white', padding: '0.25rem 0.75rem', borderRadius: '0.25rem', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}
                 >
                     Disconnect
