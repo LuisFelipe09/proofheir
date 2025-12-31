@@ -1,9 +1,22 @@
 'use client'
 
+import { useState } from 'react'
 import { usePrivy } from '@privy-io/react-auth'
+import { Copy, Check } from 'lucide-react'
 
 export function WalletConnect() {
     const { ready, authenticated, user, login, logout } = usePrivy()
+    const [isCopied, setIsCopied] = useState(false)
+
+    const handleCopy = async (address: string) => {
+        try {
+            await navigator.clipboard.writeText(address)
+            setIsCopied(true)
+            setTimeout(() => setIsCopied(false), 2000)
+        } catch (err) {
+            console.error('Failed to copy address:', err)
+        }
+    }
 
     if (!ready) {
         return (
@@ -20,7 +33,28 @@ export function WalletConnect() {
         return (
             <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', backgroundColor: '#f3f4f6', padding: '0.5rem', borderRadius: '0.5rem' }}>
                 <div style={{ fontSize: '0.875rem' }}>
-                    <div style={{ fontFamily: 'monospace' }}>{address?.slice(0, 6)}...{address?.slice(-4)}</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{ fontFamily: 'monospace' }}>{address?.slice(0, 6)}...{address?.slice(-4)}</span>
+                        {address && (
+                            <button
+                                onClick={() => handleCopy(address)}
+                                aria-label={isCopied ? "Address copied" : "Copy address"}
+                                title="Copy address"
+                                style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    padding: 0,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    color: isCopied ? '#16a34a' : '#9ca3af',
+                                    transition: 'color 0.2s'
+                                }}
+                            >
+                                {isCopied ? <Check size={14} /> : <Copy size={14} />}
+                            </button>
+                        )}
+                    </div>
                     <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
                         {user.email?.address || 'Connected'}
                     </div>

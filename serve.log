@@ -1,0 +1,27 @@
+
+> nx run web:dev
+
+> next dev
+
+   [1m[38;2;173;127;168m▲ Next.js 16.0.10[39m[22m (Turbopack)
+   - Local:         http://localhost:3000
+   - Network:       http://192.168.0.2:3000
+
+ [32m[1m✓[22m[39m Starting...
+ [32m[1m✓[22m[39m Ready in 3.3s
+ [37m[1m○[22m[39m Compiling / ...
+ [31m[1m⨯[22m[39m Error: Cannot initialize the Privy provider with an invalid Privy app ID
+    at [3mignore-listed frames[23m {
+  privyErrorCode: [90mundefined[39m,
+  type: [32m'client_error'[39m,
+  digest: [32m'2956982820'[39m
+}
+ GET / [31m500[39m in 30.9s[2m (compile: 29.5s, render: 1422ms)[22m
+ [31m[1m⨯[22m[39m Error: Cannot initialize the Privy provider with an invalid Privy app ID
+    at [3mignore-listed frames[23m {
+  privyErrorCode: [90mundefined[39m,
+  type: [32m'client_error'[39m,
+  digest: [32m'2956982820'[39m
+}
+ GET / [31m500[39m in 161ms[2m (compile: 8ms, render: 153ms)[22m
+ GET / [32m200[39m in 1343ms[2m (compile: 398ms, render: 945ms)[22m
