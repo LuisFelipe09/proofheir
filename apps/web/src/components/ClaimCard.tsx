@@ -119,8 +119,9 @@ export function ClaimCard() {
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
                 <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', marginBottom: '0.25rem' }}>Dirección del Testador</label>
+                    <label htmlFor="testator-address" style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', marginBottom: '0.25rem' }}>Dirección del Testador</label>
                     <input
+                        id="testator-address"
                         type="text"
                         value={testatorAddress}
                         onChange={(e) => setTestatorAddress(e.target.value)}
@@ -129,8 +130,9 @@ export function ClaimCard() {
                     />
                 </div>
                 <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', marginBottom: '0.25rem' }}>Token Address</label>
+                    <label htmlFor="token-address" style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', marginBottom: '0.25rem' }}>Token Address</label>
                     <input
+                        id="token-address"
                         type="text"
                         value={tokenAddress}
                         onChange={(e) => setTokenAddress(e.target.value)}
@@ -138,8 +140,9 @@ export function ClaimCard() {
                     />
                 </div>
                 <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', marginBottom: '0.25rem' }}>Autorización EIP-7702 (JSON)</label>
+                    <label htmlFor="auth-json" style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', marginBottom: '0.25rem' }}>Autorización EIP-7702 (JSON)</label>
                     <textarea
+                        id="auth-json"
                         value={authJson}
                         onChange={(e) => setAuthJson(e.target.value)}
                         placeholder='{"address": "0x...", "r": "0x...", ...}'
