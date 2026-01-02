@@ -4,4 +4,7 @@ out = "out"
 libs = ["lib"]
 cache_path = "cache"
 
+# Allow reading test fixtures
+fs_permissions = [{ access = "read", path = "test/fixtures" }]
+
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

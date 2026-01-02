@@ -20,7 +20,8 @@ contract DeployProofHeir is Script {
         console.log("MockVerifier deployed at:", address(verifier));
 
         // 2. Deploy ProofHeir
-        ProofHeir proofHeir = new ProofHeir(address(verifier));
+        string memory trustedServerDomain = "civil-registry-mock.onrender.com        "; // 40 chars
+        ProofHeir proofHeir = new ProofHeir(address(verifier), trustedServerDomain);
         console.log("ProofHeir deployed at:", address(proofHeir));
 
         // 3. Deploy MockERC20
