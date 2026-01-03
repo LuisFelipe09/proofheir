@@ -61,9 +61,40 @@ This package implements the core attestation logic for ProofHeir:
 
 ZK proof generation is computationally intensive. Debug mode can be **10-50x slower** and may cause runtime issues.
 
+#### Basic Usage (with default values)
+
 ```bash
 cd packages/notary
 cargo run --release
+```
+
+#### Custom Parameters
+
+The prover accepts the following command-line arguments:
+
+| Argument | Short | Description | Format | Default |
+|----------|-------|-------------|--------|---------|
+| `--recipient` | `-r` | Beneficiary Ethereum address | 40 hex chars (20 bytes) | `abababababababababababababababababababab` |
+| `--nuip` | `-n` | National ID number | Numeric string | `454545454` |
+| `--salt` | `-s` | Salt for ID commitment | 64 hex chars (32 bytes) | `1111...1111` (32 bytes) |
+
+**Examples**:
+
+```bash
+# Custom recipient address
+cargo run --release -- --recipient 0x1234567890abcdef1234567890abcdef12345678
+
+# Custom NUIP
+cargo run --release -- --nuip 987654321
+
+# All custom parameters
+cargo run --release -- \
+  --recipient 0xabcdef1234567890abcdef1234567890abcdef12 \
+  --nuip 123456789 \
+  --salt 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+
+# Show help
+cargo run --release -- --help
 ```
 
 **Expected output**:

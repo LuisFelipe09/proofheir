@@ -47,6 +47,9 @@ pub async fn prover<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
     mut verifier_extra_socket: T,
     server_addr: &SocketAddr,
     uri: &str,
+    recipient: [u8; 20],
+    nuip: &str,
+    salt: [u8; 32],
 ) -> Result<(), Box<dyn std::error::Error>> {
     let uri = uri.parse::<Uri>()?;
 
@@ -110,8 +113,9 @@ pub async fn prover<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
     tokio::spawn(connection);
 
     // MPC-TLS: Send Request and wait for Response.
+    let nuip_number: u64 = nuip.parse().map_err(|_| "Invalid NUIP format")?;
     let payload = serde_json::json!({
-        "nuip": 454545454,
+        "nuip": nuip_number,
         "ip": "143.137.96.53"
     });
     let payload_bytes = Bytes::from(payload.to_string());
@@ -187,12 +191,7 @@ pub async fn prover<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
         .first()
         .ok_or("No received secrets found (blinder)")?; 
 
-    // Hardcoded demo values or passed from client args (for NUIP/Salt)
-    // Ideally these come from the client request
-    let recipient = [0xab; 20]; // Mock recipient
-    let nuip ="454545454";
-    let salt = [0x11u8; 32];
-    
+    // Use values passed as parameters from client
     let proof_input = prepare_zk_proof_input(
         received, 
         received_commitment, 
