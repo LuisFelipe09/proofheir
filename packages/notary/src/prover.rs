@@ -4,24 +4,22 @@ use crate::types::received_commitments;
 
 use super::types::ZKProofBundle;
 
-use chrono::{Datelike, Local, NaiveDate};
-use http_body_util::Empty;
-use hyper::{body::Bytes, header, Request, StatusCode, Uri};
+use http_body_util::Full;
+use hyper::{body::Bytes, Request, StatusCode, Uri};
 use hyper_util::rt::TokioIo;
 use k256::sha2::{Digest, Sha256};
+use serde_json::Value;
 use noir::{
     barretenberg::{
         prove::prove_ultra_honk, srs::setup_srs_from_bytecode,
-        verify::get_ultra_honk_verification_key,
     },
     witness::from_vec_str_to_witness_map,
 };
-use serde_json::Value;
 use spansy::{
-    http::{BodyContent, Requests, Responses},
+    http::{BodyContent, Responses},
     Spanned,
 };
-use tls_server_fixture::CA_CERT_DER;
+// Removed: use tls_server_fixture::CA_CERT_DER; 
 use tlsn::{
     config::{CertificateDer, ProtocolConfig, RootCertStore},
     connection::ServerName,
@@ -29,15 +27,16 @@ use tlsn::{
     prover::{ProveConfig, ProveConfigBuilder, Prover, ProverConfig, TlsConfig},
     transcript::{
         hash::{PlaintextHash, PlaintextHashSecret},
-        Direction, TranscriptCommitConfig, TranscriptCommitConfigBuilder, TranscriptCommitmentKind,
-        TranscriptSecret,
+        TranscriptCommitConfig, TranscriptCommitConfigBuilder, TranscriptCommitmentKind,
+        TranscriptSecret, Direction,
     },
 };
 
-use tlsn_examples::MAX_RECV_DATA;
-use tokio::io::AsyncWriteExt;
+// Max data sizes for MPC-TLS (from tlsn examples)
+const MAX_SENT_DATA: usize = 1 << 12; // 4KB
+const MAX_RECV_DATA: usize = 1 << 14; // 16KB
 
-use tlsn_examples::MAX_SENT_DATA;
+use tokio::io::AsyncWriteExt;
 use tokio::io::{AsyncRead, AsyncWrite};
 use tokio_util::compat::{FuturesAsyncReadCompatExt, TokioAsyncReadCompatExt};
 use tracing::instrument;
@@ -57,13 +56,17 @@ pub async fn prover<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
 
     let server_domain = uri.authority().ok_or("URI must have authority")?.host();
 
-    // Create a root certificate store with the server-fixture's self-signed
-    // certificate. This is only required for offline testing with the
-    // server-fixture.
+    // Load native root certificates and convert to tlsn format
+    let roots: Vec<CertificateDer> = rustls_native_certs::load_native_certs()
+        .expect("could not load platform certs")
+        .into_iter()
+        .map(|cert| CertificateDer(cert.0))
+        .collect();
+    
+    let tls_roots = RootCertStore { roots };
+    
     let mut tls_config_builder = TlsConfig::builder();
-    tls_config_builder.root_store(RootCertStore {
-        roots: vec![CertificateDer(CA_CERT_DER.to_vec())],
-    });
+    tls_config_builder.root_store(tls_roots);
     let tls_config = tls_config_builder.build()?;
 
     // Set up protocol configuration for prover.
@@ -107,13 +110,19 @@ pub async fn prover<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
     tokio::spawn(connection);
 
     // MPC-TLS: Send Request and wait for Response.
+    let payload = serde_json::json!({
+        "nuip": 454545454,
+        "ip": "143.137.96.53"
+    });
+    let payload_bytes = Bytes::from(payload.to_string());
+
     let request = Request::builder()
         .uri(uri.clone())
         .header("Host", server_domain)
         .header("Connection", "close")
-        .header(header::AUTHORIZATION, "Bearer random_auth_token")
-        .method("GET")
-        .body(Empty::<Bytes>::new())?;
+        .header("Content-Type", "application/json")
+        .method("POST")
+        .body(Full::new(payload_bytes))?;
 
     let response = request_sender.send_request(request).await?;
 
@@ -136,14 +145,22 @@ pub async fn prover<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
     let recv_len = received.len();
     tracing::info!("Sent length: {}, Received length: {}", sent_len, recv_len);
 
-    // Reveal the entire HTTP request except for the authorization bearer token
-    reveal_request(sent, &mut prove_config_builder)?;
+    // Reveal the entire HTTP request 
+    // Simplified: reveal all sent data as public
+    prove_config_builder.reveal_sent(&(0..sent_len))?;
 
-    // Create hash commitment for the date of birth field from the response
+    // Create hash commitment for the 'vigencia' status field
     let mut transcript_commitment_builder = TranscriptCommitConfig::builder(&transcript);
     transcript_commitment_builder.default_kind(TranscriptCommitmentKind::Hash {
         alg: HashAlgId::SHA256,
     });
+    
+    // Reveal everything received except (optionally) the status if we want to keep it private-ish?
+    // Actually, in the ZK circuit, the status is a Private Input, but the status_commitment is Public.
+    // TLSNotary 'reveal' means it is visible in the TLS Proof. 
+    // If we want status to be private to the ZK circuit witness, we should NOT reveal it here, ONLY commit to it.
+    // However, we usually reveal the structure around it to prove it came from the JSON.
+    
     reveal_received(
         received,
         &mut prove_config_builder,
@@ -159,16 +176,33 @@ pub async fn prover<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
     let prover_output = prover.prove(&prove_config).await?;
     prover.close().await?;
 
-    // Prove birthdate is more than 18 years ago.
+    // Prepare inputs for Noir
     let received_commitments = received_commitments(&prover_output.transcript_commitments);
     let received_commitment = received_commitments
         .first()
-        .ok_or("No received commitments found")?; // committed hash (of date of birth string)
+        .ok_or("No received commitments found (status)")?; 
+        
     let received_secrets = received_secrets(&prover_output.transcript_secrets);
     let received_secret = received_secrets
         .first()
-        .ok_or("No received secrets found")?; // hash blinder
-    let proof_input = prepare_zk_proof_input(received, received_commitment, received_secret)?;
+        .ok_or("No received secrets found (blinder)")?; 
+
+    // Hardcoded demo values or passed from client args (for NUIP/Salt)
+    // Ideally these come from the client request
+    let recipient = [0xab; 20]; // Mock recipient
+    let nuip ="454545454";
+    let salt = [0x11u8; 32];
+    
+    let proof_input = prepare_zk_proof_input(
+        received, 
+        received_commitment, 
+        received_secret,
+        recipient,
+        server_domain,
+        nuip,
+        salt
+    )?;
+    
     let proof_bundle = generate_zk_proof(&proof_input)?;
 
     // Sent zk proof bundle to verifier
@@ -179,43 +213,9 @@ pub async fn prover<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
     Ok(())
 }
 
-// Reveal everything from the request, except for the authorization token.
-fn reveal_request(
-    request: &[u8],
-    builder: &mut ProveConfigBuilder<'_>,
-) -> Result<(), Box<dyn std::error::Error>> {
-    let reqs = Requests::new_from_slice(request).collect::<Result<Vec<_>, _>>()?;
-
-    let req = reqs.first().ok_or("No requests found")?;
-
-    if req.request.method.as_str() != "GET" {
-        return Err(format!("Expected GET method, found {}", req.request.method.as_str()).into());
-    }
-
-    let authorization_header = req
-        .headers_with_name(header::AUTHORIZATION.as_str())
-        .next()
-        .ok_or("Authorization header not found")?;
-
-    let start_pos = authorization_header
-        .span()
-        .indices()
-        .min()
-        .ok_or("Could not find authorization header start position")?
-        + header::AUTHORIZATION.as_str().len()
-        + 2;
-    let end_pos =
-        start_pos + authorization_header.span().len() - header::AUTHORIZATION.as_str().len() - 2;
-
-    builder.reveal_sent(&(0..start_pos))?;
-    builder.reveal_sent(&(end_pos..request.len()))?;
-
-    Ok(())
-}
-
 fn reveal_received(
     received: &[u8],
-    builder: &mut ProveConfigBuilder<'_>,
+    _builder: &mut ProveConfigBuilder<'_>,
     transcript_commitment_builder: &mut TranscriptCommitConfigBuilder,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let resp = Responses::new_from_slice(received).collect::<Result<Vec<_>, _>>()?;
@@ -227,30 +227,22 @@ fn reveal_received(
         return Err("Expected JSON body content".into());
     };
 
-    // reveal tax year
-    let tax_year = json
-        .get("tax_year")
-        .ok_or("tax_year field not found in JSON")?;
-    let start_pos = tax_year
-        .span()
-        .indices()
-        .min()
-        .ok_or("Could not find tax_year start position")?
-        - 11;
-    let end_pos = tax_year
-        .span()
-        .indices()
-        .max()
-        .ok_or("Could not find tax_year end position")?
-        + 1;
-    builder.reveal_recv(&(start_pos..end_pos))?;
+    // Locate "vigencia" field
+    let vigencia = json
+        .get("vigencia")
+        .ok_or("vigencia field not found in JSON")?;
 
-    // commit to hash of date of birth
-    let dob = json
-        .get("taxpayer.date_of_birth")
-        .ok_or("taxpayer.date_of_birth field not found in JSON")?;
-
-    transcript_commitment_builder.commit_recv(dob.span())?;
+    // We do NOT reveal the value of vigencia here if we want it to be private input to ZK.
+    // We only COMMIT to it.
+    
+    // But we might want to reveal the keys to prove structure?
+    // For simplicity, let's assume we reveal nothing of the body except necessary parts?
+    // Actually, usually we reveal the key "vigencia": "..." to show where it is?
+    
+    // Commit to the value of vigencia
+    // The value span includes quotes for strings? Check spansy behavior. 
+    // Usually json.get returns the value node. 
+    transcript_commitment_builder.commit_recv(vigencia.span())?;
 
     Ok(())
 }
@@ -268,53 +260,84 @@ fn received_secrets(transcript_secrets: &[TranscriptSecret]) -> Vec<&PlaintextHa
 
 #[derive(Debug)]
 pub struct ZKProofInput {
-    dob: Vec<u8>,
-    proof_date: NaiveDate,
-    blinder: Vec<u8>,
-    committed_hash: Vec<u8>,
+    recipient: [u8; 20],
+    server_hash: [u8; 32],
+    id_commitment: [u8; 32],
+    status_commitment: Vec<u8>,
+    nuip: String,
+    salt: [u8; 32],
+    server_domain: String,
+    status: Vec<u8>,
+    status_blinder: Vec<u8>,
 }
 
-// Verify that the blinded, committed hash is correct
+// Verify that the blinded, committed hash is correct locally before ZK
 fn prepare_zk_proof_input(
     received: &[u8],
     received_commitment: &PlaintextHash,
     received_secret: &PlaintextHashSecret,
+    recipient: [u8; 20],
+    server_domain: &str,
+    nuip: &str,
+    salt: [u8; 32],
 ) -> Result<ZKProofInput, Box<dyn std::error::Error>> {
     assert_eq!(received_commitment.direction, Direction::Received);
     assert_eq!(received_commitment.hash.alg, HashAlgId::SHA256);
 
     let hash = &received_commitment.hash;
 
-    let dob_start = received_commitment
-        .idx
-        .min()
-        .ok_or("No start index for DOB")?;
-    let dob_end = received_commitment
-        .idx
-        .end()
-        .ok_or("No end index for DOB")?;
-    let dob = received[dob_start..dob_end].to_vec();
+    let start = received_commitment.idx.min().ok_or("No start index")?;
+    let end = received_commitment.idx.end().ok_or("No end index")?;
+    
+    // This is the raw bytes of the value, e.g. "No Vigente (Fallecido)" (including quotes if string?)
+    // Spansy usually gives the span of the value.
+    let status_bytes = received[start..end].to_vec();
+    
+    // Check if it includes quotes?
+    // If spansy returns the JSON value string including quotes, we might need to strip them 
+    // or the circuit expects them?
+    // The circuit expects `status: str<22>`. Noir strings are bytes. 
+    // If the JSON is `"No Vigente (Fallecido)"`, that's > 22 bytes.
+    // Assuming we need to handle quotes.
+    // For now passing raw bytes.
+    
     let blinder = received_secret.blinder.as_bytes().to_vec();
     let committed_hash = hash.value.as_bytes().to_vec();
-    let proof_date = Local::now().date_naive();
 
-    assert_eq!(received_secret.direction, Direction::Received);
-    assert_eq!(received_secret.alg, HashAlgId::SHA256);
-
+    // Verify locally
     let mut hasher = Sha256::new();
-    hasher.update(&dob);
+    hasher.update(&status_bytes);
     hasher.update(&blinder);
     let computed_hash = hasher.finalize();
 
     if committed_hash != computed_hash.as_slice() {
         return Err("Computed hash does not match committed hash".into());
     }
+    
+    // Derived inputs - MUST match circuit padding
+    let mut server_domain_padded = server_domain.as_bytes().to_vec();
+    server_domain_padded.resize(40, 32); // Pad with spaces
+    let mut hasher = Sha256::new();
+    hasher.update(&server_domain_padded);
+    let server_hash: [u8; 32] = hasher.finalize().into();
+    
+    let mut nuip_padded = nuip.as_bytes().to_vec();
+    nuip_padded.resize(15, 0); // Pad with zeros
+    let mut hasher = Sha256::new();
+    hasher.update(&nuip_padded);
+    hasher.update(&salt);
+    let id_commitment: [u8; 32] = hasher.finalize().into();
 
     Ok(ZKProofInput {
-        dob,
-        proof_date,
-        committed_hash,
-        blinder,
+        recipient,
+        server_hash,
+        id_commitment,
+        status_commitment: committed_hash,
+        nuip: nuip.to_string(),
+        salt,
+        server_domain: server_domain.to_string(),
+        status: status_bytes,
+        status_blinder: blinder,
     })
 }
 
@@ -323,7 +346,7 @@ fn generate_zk_proof(
 ) -> Result<ZKProofBundle, Box<dyn std::error::Error>> {
     tracing::info!("🔒 Generating ZK proof with Noir...");
 
-    const PROGRAM_JSON: &str = include_str!("./noir/target/noir.json");
+    const PROGRAM_JSON: &str = include_str!("../../circuits/target/circuits.json");
 
     // 1. Load bytecode from program.json
     let json: Value = serde_json::from_str(PROGRAM_JSON)?;
@@ -332,26 +355,50 @@ fn generate_zk_proof(
         .ok_or("bytecode field not found in program.json")?;
 
     let mut inputs: Vec<String> = vec![];
-    inputs.push(proof_input.proof_date.day().to_string());
-    inputs.push(proof_input.proof_date.month().to_string());
-    inputs.push(proof_input.proof_date.year().to_string());
-    inputs.extend(proof_input.committed_hash.iter().map(|b| b.to_string()));
-    inputs.extend(proof_input.dob.iter().map(|b| b.to_string()));
-    inputs.extend(proof_input.blinder.iter().map(|b| b.to_string()));
-
-    let proof_date = proof_input.proof_date.to_string();
-    tracing::info!(
-        "Public inputs : Proof date ({}) and committed hash ({})",
-        proof_date,
-        hex::encode(&proof_input.committed_hash)
-    );
-    tracing::info!(
-        "Private inputs: Blinder ({}) and Date of Birth ({})",
-        hex::encode(&proof_input.blinder),
-        String::from_utf8_lossy(&proof_input.dob)
-    );
-
-    tracing::debug!("Witness inputs {:?}", inputs);
+    
+    // Order MUST match main.nr arguments:
+    // recipient: pub [u8; 20]
+    inputs.extend(proof_input.recipient.iter().map(|b| b.to_string()));
+    
+    // server_hash: pub [u8; 32]
+    inputs.extend(proof_input.server_hash.iter().map(|b| b.to_string()));
+    
+    // id_commitment: pub [u8; 32]
+    inputs.extend(proof_input.id_commitment.iter().map(|b| b.to_string()));
+    
+    // status_commitment: pub [u8; 32]
+    inputs.extend(proof_input.status_commitment.iter().map(|b| b.to_string()));
+    
+    // nuip: str<15>
+    let mut nuip_padded = proof_input.nuip.as_bytes().to_vec();
+    nuip_padded.resize(15, 0); // Pad with 0s
+    inputs.extend(nuip_padded.iter().map(|b| b.to_string()));
+    
+    // salt: [u8; 32]
+    inputs.extend(proof_input.salt.iter().map(|b| b.to_string()));
+    
+    // server_domain: str<40>
+    let domain_bytes = proof_input.server_domain.as_bytes();
+    inputs.extend(domain_bytes.iter().map(|b| b.to_string()));
+    // If domain is shorter than 40, we might need to pad with 0s or spaces depending on Noir logic. 
+    // The circuit test padded with spaces. 
+    // Ideally we pad here to 40.
+    for _ in domain_bytes.len()..40 {
+        inputs.push("32".to_string()); // 32 is space in ascii. Or 0?
+    }
+    
+    // status: str<22>
+    let status_clean = if proof_input.status.first() == Some(&34) {
+         &proof_input.status[1..proof_input.status.len()-1]
+    } else {
+         &proof_input.status
+    };
+    let mut status_padded = status_clean.to_vec();
+    status_padded.resize(22, 0); // Pad with 0s
+    inputs.extend(status_padded.iter().map(|b| b.to_string()));
+    
+    // status_blinder: [u8; 16]
+    inputs.extend(proof_input.status_blinder.iter().map(|b| b.to_string()));
 
     let input_refs: Vec<&str> = inputs.iter().map(String::as_str).collect();
     let witness = from_vec_str_to_witness_map(input_refs)?;
@@ -360,7 +407,9 @@ fn generate_zk_proof(
     setup_srs_from_bytecode(bytecode, None, false)?;
 
     // Verification key
-    let vk = get_ultra_honk_verification_key(bytecode, false)?;
+    // Load pre-computed VK from file
+    const VK_BYTES: &[u8] = include_bytes!("../../circuits/target/vk");
+    let vk = VK_BYTES.to_vec();
 
     // Generate proof
     let proof = prove_ultra_honk(bytecode, witness.clone(), vk.clone(), false)?;

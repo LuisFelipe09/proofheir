@@ -14,49 +14,78 @@ fn main(
     status: str<22>,             // "No Vigente (Fallecido)"
     status_blinder: [u8; 16]     // Blinder for the status commitment
 ) {
-    // 1. Verify Status Content
-    let expected_status = "No Vigente (Fallecido)";
-    assert(status == expected_status);
+    // 1. Check Status Content
+    let is_dead = check_status(status);
+    assert(is_dead);
 
-    // 2. Verify Status Link to TLS (Commitment Check)
-    let status_hash_valid = verify_commitment(status.as_bytes(), status_blinder, status_commitment);
-    assert(status_hash_valid);
+    // 2. Check Status Commitment
+    let status_valid = check_status_commitment(status, status_blinder, status_commitment);
+    assert(status_valid);
 
-    // 3. Verify Server Identity
-    let computed_server_hash = sha256::digest(server_domain.as_bytes());
-    assert(computed_server_hash == server_hash);
+    // 3. Check Server Identity
+    let server_valid = check_server_identity(server_domain, server_hash);
+    assert(server_valid);
 
-    // 4. Verify Identity (Who is this?)
-    let computed_id_hash = hash_id_salt(nuip, salt);
-    assert(computed_id_hash == id_commitment);
+    // 4. Check Identity
+    let identity_valid = check_identity(nuip, salt, id_commitment);
+    assert(identity_valid);
 }
 
-// Specialized for N=22 (status length)
-fn verify_commitment(data: [u8; 22], blinder: [u8; 16], commitment: [u8; 32]) -> bool {
+fn check_status(status: str<22>) -> bool {
+    let expected_status = "No Vigente (Fallecido)";
+    let is_equal = status == expected_status;
+    println(f"Is Dead? {is_equal}");
+    is_equal
+}
+
+fn check_status_commitment(status: str<22>, blinder: [u8; 16], commitment: [u8; 32]) -> bool {
+    // 22 bytes status + 16 bytes blinder = 38 bytes
+    let input = make_status_input(status, blinder);
+    let computed_hash = sha256::sha256_var(input, 38);
+    let is_valid = computed_hash == commitment;
+    println(f"Status Commitment Valid? {is_valid}");
+    is_valid
+}
+
+fn check_server_identity(server_domain: str<40>, expected_hash: [u8; 32]) -> bool {
+    // 40 bytes domain
+    let computed_hash = sha256::sha256_var(server_domain.as_bytes(), 40);
+    let is_valid = computed_hash == expected_hash;
+    println(f"Server Identity Valid? {is_valid}");
+    is_valid
+}
+
+fn check_identity(nuip: str<15>, salt: [u8; 32], expected_hash: [u8; 32]) -> bool {
+    // 15 bytes nuip + 32 bytes salt = 47 bytes
+    let input = make_identity_input(nuip, salt);
+    let computed_hash = sha256::sha256_var(input, 47);
+    let is_valid = computed_hash == expected_hash;
+    println(f"Identity Valid? {is_valid}");
+    is_valid
+}
+
+fn make_status_input(status: str<22>, blinder: [u8; 16]) -> [u8; 38] {
     let mut input: [u8; 38] = [0; 38];
+    let status_bytes = status.as_bytes();
     for i in 0..22 {
-        input[i] = data[i];
+        input[i] = status_bytes[i];
     }
     for i in 0..16 {
         input[22 + i] = blinder[i];
     }
-    
-    let computed = sha256::digest(input);
-    computed == commitment
+    input
 }
 
-fn hash_id_salt(id: str<15>, salt: [u8; 32]) -> [u8; 32] {
-    let id_bytes = id.as_bytes();
+fn make_identity_input(nuip: str<15>, salt: [u8; 32]) -> [u8; 47] {
     let mut input: [u8; 47] = [0; 47];
-    
+    let nuip_bytes = nuip.as_bytes();
     for i in 0..15 {
-        input[i] = id_bytes[i];
+        input[i] = nuip_bytes[i];
     }
     for i in 0..32 {
         input[15 + i] = salt[i];
     }
-
-    sha256::digest(input)
+    input
 }
 
 #[test]
@@ -70,18 +99,13 @@ fn test_main() {
     let status_blinder = [0x22u8; 16];
 
     // Compute expected commitments
-    let server_hash = sha256::digest(server_domain.as_bytes());
-    let id_commitment = hash_id_salt(nuip, salt);
+    let server_hash = sha256::sha256_var(server_domain.as_bytes(), 40);
+    
+    let id_input = make_identity_input(nuip, salt);
+    let id_commitment = sha256::sha256_var(id_input, 47);
 
-    let mut status_input: [u8; 38] = [0; 38];
-    let status_bytes = status.as_bytes();
-    for i in 0..22 {
-        status_input[i] = status_bytes[i];
-    }
-    for i in 0..16 {
-        status_input[22 + i] = status_blinder[i];
-    }
-    let status_commitment = sha256::digest(status_input);
+    let status_input = make_status_input(status, status_blinder);
+    let status_commitment = sha256::sha256_var(status_input, 38);
 
     main(
         recipient,
@@ -101,22 +125,17 @@ fn test_main_wrong_status() {
     let recipient = [0xabu8; 20];
     let nuip: str<15> = "123456789012345";
     let salt = [0x11u8; 32];
-    let server_domain: str<40> = "civil-registry-mock.onrender.com        ";
+    let server_domain: str<40> = "civil-registry-mock.onrender.com        "; // padded to 40
     let status: str<22> = "Vigente (Vivo)        "; 
     let status_blinder = [0x22u8; 16];
 
-    let server_hash = sha256::digest(server_domain.as_bytes());
-    let id_commitment = hash_id_salt(nuip, salt);
+    let server_hash = sha256::sha256_var(server_domain.as_bytes(), 40);
     
-    let mut status_input: [u8; 38] = [0; 38];
-    let status_bytes = status.as_bytes();
-    for i in 0..22 {
-        status_input[i] = status_bytes[i];
-    }
-    for i in 0..16 {
-        status_input[22 + i] = status_blinder[i];
-    }
-    let status_commitment = sha256::digest(status_input);
+    let id_input = make_identity_input(nuip, salt);
+    let id_commitment = sha256::sha256_var(id_input, 47);
+
+    let status_input = make_status_input(status, status_blinder);
+    let status_commitment = sha256::sha256_var(status_input, 38);
 
     main(
         recipient,
