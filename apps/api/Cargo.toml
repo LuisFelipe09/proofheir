@@ -1,0 +1,44 @@
+[package]
+name = "proofheir-api"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Web framework
+axum = "0.7"
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+
+# Async runtime
+tokio = { workspace = true }
+tokio-util = { version = "0.7", features = ["compat"] }
+futures = "0.3"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+bincode = "1.3"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Hex encoding
+hex = "0.4"
+
+# Crypto
+k256 = { version = "0.13", features = ["ecdsa", "sha256"] }
+
+# HTTP client for pre-verification
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+
+# Internal dependencies
+notary = { path = "../../packages/notary" }
+
+[[bin]]
+name = "proofheir-api"
+path = "src/main.rs"

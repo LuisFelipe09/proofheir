@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useAccount, useReadContract, usePublicClient } from 'wagmi'
 import { useWallets } from '@privy-io/react-auth'
 import { encodeFunctionData, pad, formatUnits, type Address, type Hex } from 'viem'
+import { CONTRACTS } from '../config/contracts'
 
 const PROOF_HEIR_ABI = [
     {
@@ -26,11 +27,15 @@ export function ClaimCard() {
     const publicClient = usePublicClient()
 
     const [testatorAddress, setTestatorAddress] = useState('')
-    const [recipientAddress, setRecipientAddress] = useState('0x03f72d5859858AFF7b93096B4AD9593442DD2327')
-    const [tokenAddress, setTokenAddress] = useState('0x0165878A594ca255338adfa4d48449f69242Eb8F')
+    const [recipientAddress, setRecipientAddress] = useState('')
+    const [tokenAddress, setTokenAddress] = useState(CONTRACTS.MOCK_TOKEN as string)
     const [authJson, setAuthJson] = useState('')
 
-    const [status, setStatus] = useState<'idle' | 'executing' | 'success' | 'error'>('idle')
+    // New fields for proof generation
+    const [nuipInput, setNuipInput] = useState('')
+    const [saltInput, setSaltInput] = useState('0x1111111111111111111111111111111111111111111111111111111111111111')
+
+    const [status, setStatus] = useState<'idle' | 'generating' | 'executing' | 'success' | 'error'>('idle')
     const [errorMsg, setErrorMsg] = useState('')
     const [txHash, setTxHash] = useState<string | null>(null)
 
@@ -45,8 +50,45 @@ export function ClaimCard() {
         }
 
         try {
+            setStatus('generating')
 
-            // Si hay un JSON de auth y NO está delegado, lo parseamos (lógica legacy, por si acaso)
+            // 1. Generate ZK Proof via API
+            const recipient = (recipientAddress || connectedAddress) as Address
+            const proofRes = await fetch('/api/generate-proof', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    recipient,
+                    nuip: nuipInput,
+                    salt: saltInput,
+                }),
+            })
+
+
+            if (!proofRes.ok) {
+                const errorData = await proofRes.json()
+                throw new Error(errorData.error || 'Failed to generate proof')
+            }
+
+            const { proof: rawProof, public_inputs: rawPublicInputs } = await proofRes.json()
+
+            // Ensure proof has 0x prefix
+            const proof = rawProof.startsWith('0x') ? rawProof : `0x${rawProof}`
+
+            // Ensure all public inputs have 0x prefix
+            const publicInputs = rawPublicInputs.map((input: string) =>
+                input.startsWith('0x') ? input : `0x${input}`
+            )
+
+            console.log('Proof generated:', {
+                proofLength: proof.length,
+                inputsCount: publicInputs.length,
+                firstInput: publicInputs[0]
+            })
+
+            setStatus('executing')
+
+            // 2. Parse authorization (existing logic)
             let authorization
             if (authJson && !authJson.trim().startsWith('{')) {
                 // Si no es JSON válido lo ignoramos
@@ -66,16 +108,18 @@ export function ClaimCard() {
                 }
             }
 
-            const proof = '0x' as Hex
-            const recipient = (recipientAddress || connectedAddress) as Address
-            const publicInputs = [pad(recipient, { size: 32 }) as Hex]
             const tokens = [tokenAddress as Address]
 
-            // Encode the function call
+            // 3. Encode the function call with real proof
             const data = encodeFunctionData({
                 abi: PROOF_HEIR_ABI,
                 functionName: 'claim',
-                args: [proof, publicInputs, tokens, recipient]
+                args: [
+                    proof as Hex,
+                    publicInputs as Hex[],
+                    tokens,
+                    recipient
+                ]
             })
 
             // Hablamos directamente con el provider de la embedded wallet
@@ -138,6 +182,26 @@ export function ClaimCard() {
                     />
                 </div>
                 <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', marginBottom: '0.25rem' }}>NUIP (ID Nacional)</label>
+                    <input
+                        type="text"
+                        value={nuipInput}
+                        onChange={(e) => setNuipInput(e.target.value)}
+                        placeholder="123456789"
+                        style={{ width: '100%', padding: '8px', border: '1px solid #d1d5db', borderRadius: '0.25rem', fontSize: '0.875rem', fontFamily: 'monospace' }}
+                    />
+                </div>
+                <div>
+                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', marginBottom: '0.25rem' }}>Salt (32 bytes hex)</label>
+                    <input
+                        type="text"
+                        value={saltInput}
+                        onChange={(e) => setSaltInput(e.target.value)}
+                        placeholder="0x1111..."
+                        style={{ width: '100%', padding: '8px', border: '1px solid #d1d5db', borderRadius: '0.25rem', fontSize: '0.725rem', fontFamily: 'monospace' }}
+                    />
+                </div>
+                <div>
                     <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', marginBottom: '0.25rem' }}>Autorización EIP-7702 (JSON)</label>
                     <textarea
                         value={authJson}
@@ -150,7 +214,7 @@ export function ClaimCard() {
 
             <button
                 onClick={handleClaim}
-                disabled={status === 'executing'}
+                disabled={status === 'generating' || status === 'executing'}
                 style={{
                     width: '100%',
                     padding: '12px',
@@ -159,10 +223,10 @@ export function ClaimCard() {
                     color: 'white',
                     backgroundColor: status === 'success' ? '#16a34a' : status === 'error' ? '#dc2626' : '#4f46e5',
                     border: 'none',
-                    cursor: (status === 'executing') ? 'not-allowed' : 'pointer'
+                    cursor: (status === 'generating' || status === 'executing') ? 'not-allowed' : 'pointer'
                 }}
             >
-                {status === 'executing' ? 'Ejecutando...' : 'Confirmar y Ejecutar'}
+                {status === 'generating' ? 'Generando Prueba...' : status === 'executing' ? 'Ejecutando Claim...' : 'Confirmar y Ejecutar'}
             </button>
 
             {status === 'success' && txHash && (

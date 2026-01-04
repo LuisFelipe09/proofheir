@@ -1,8 +1,6 @@
 use notary::prover::prover;
+use notary::verifier::verifier;
 use clap::Parser;
-
-mod verifier;
-use verifier::verifier;
 
 /// TLSNotary Prover for generating ZK proofs of death certificates
 #[derive(Parser, Debug)]
@@ -94,10 +92,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (prover_socket, verifier_socket) = tokio::io::duplex(1 << 23);
     let (prover_extra_socket, verifier_extra_socket) = tokio::io::duplex(1 << 23);
 
-    let (_, transcript) = tokio::try_join!(
+    let (proof_bundle, transcript) = tokio::try_join!(
         prover(prover_socket, prover_extra_socket, &server_addr, &uri, recipient, &nuip, salt),
         verifier(verifier_socket, verifier_extra_socket)
     )?;
+
+    // Log proof bundle info
+    println!("\n📦 Proof Bundle Generated:");
+    println!("   Proof size: {} bytes", proof_bundle.proof.len());
+    println!("   VK size: {} bytes", proof_bundle.vk.len());
 
     println!("---");
     println!("Successfully verified endpoint: {}", &uri);

@@ -10,11 +10,11 @@ contract DeployProofHeir is Script {
     function setUp() public {}
 
     function run() public {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        // Use the private key from --private-key flag or PRIVATE_KEY env var
+        vm.startBroadcast();
+
         address targetWallet = 0xC7617F5aC47db5b237bCc7Eb1B2C3E1Da0Bac3f8;
         
-        vm.startBroadcast(deployerPrivateKey);
-
         // 1. Deploy Verifier (using Mock for now)
         MockVerifier verifier = new MockVerifier();
         console.log("MockVerifier deployed at:", address(verifier));

@@ -50,7 +50,7 @@ pub async fn prover<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
     recipient: [u8; 20],
     nuip: &str,
     salt: [u8; 32],
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<ZKProofBundle, Box<dyn std::error::Error>> {
     let uri = uri.parse::<Uri>()?;
 
     if uri.scheme().map(|s| s.as_str()) != Some("https") {
@@ -204,12 +204,13 @@ pub async fn prover<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
     
     let proof_bundle = generate_zk_proof(&proof_input)?;
 
-    // Sent zk proof bundle to verifier
+    // Send zk proof bundle to verifier
     let serialized_proof = bincode::serialize(&proof_bundle)?;
     verifier_extra_socket.write_all(&serialized_proof).await?;
     verifier_extra_socket.shutdown().await?;
 
-    Ok(())
+    // Return the proof bundle for API usage
+    Ok(proof_bundle)
 }
 
 fn reveal_received(
@@ -412,8 +413,27 @@ fn generate_zk_proof(
 
     // Generate proof
     let proof = prove_ultra_honk(bytecode, witness.clone(), vk.clone(), false)?;
-    tracing::info!("✅ Proof generated ({} bytes)", proof.len());
+    tracing::info!("✅ ZK Proof generated successfully!");
+    tracing::info!("   Proof size: {} bytes", proof.len());
+    tracing::info!("   VK size: {} bytes", vk.len());
 
-    let proof_bundle = ZKProofBundle { vk, proof };
-    Ok(proof_bundle)
+    // Convert status_commitment from Vec<u8> to [u8; 32]
+    let status_commitment: [u8; 32] = proof_input.status_commitment
+        .as_slice()
+        .try_into()
+        .map_err(|_| format!("status_commitment must be exactly 32 bytes, got {}", proof_input.status_commitment.len()))?;
+
+    // Create PublicInputs struct with ALL the values used in the proof
+    let public_inputs = crate::types::PublicInputs {
+        recipient: proof_input.recipient,
+        server_hash: proof_input.server_hash,
+        id_commitment: proof_input.id_commitment,
+        status_commitment,
+    };
+
+    Ok(ZKProofBundle {
+        vk,
+        proof,
+        public_inputs,
+    })
 }

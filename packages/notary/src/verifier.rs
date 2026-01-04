@@ -1,4 +1,4 @@
-use notary::types::{received_commitments, ZKProofBundle};
+use crate::types::{received_commitments, ZKProofBundle};
 use noir::barretenberg::verify::{get_ultra_honk_verification_key, verify_ultra_honk};
 use serde_json::Value;
 use tlsn::{

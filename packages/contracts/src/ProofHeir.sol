@@ -14,8 +14,21 @@ contract ProofHeir {
     // must be padded to 40
     bytes32 public immutable trustedServerHash;
 
-    // Commitment of the owner's identity: Hash(RealID + Salt)
-    bytes32 public identityCommitment;
+    /// @custom:storage-location erc7201:proofheir.storage.main
+    struct ProofHeirStorage {
+        // Commitment of the owner's identity: Hash(RealID + Salt)
+        bytes32 identityCommitment;
+    }
+
+    // keccak256(abi.encode(uint256(keccak256("proofheir.storage.main")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant PROOFHEIR_STORAGE_LOCATION = 
+        0x8d0a5b5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e5e00;
+
+    function _getProofHeirStorage() private pure returns (ProofHeirStorage storage $) {
+        assembly {
+            $.slot := PROOFHEIR_STORAGE_LOCATION
+        }
+    }
 
     event AssetsClaimed(address indexed heir, address indexed recipient, address token, uint256 amount);
     event IdentityRegistered(address indexed user, bytes32 commitment);
@@ -40,9 +53,18 @@ contract ProofHeir {
      * @dev Ideally this should also require a ZK proof of ownership/life at the moment of registration.
      */
     function register(bytes32 _identityCommitment) external onlyOwner {
-        require(identityCommitment == bytes32(0), "Identity already registered");
-        identityCommitment = _identityCommitment;
+        ProofHeirStorage storage $ = _getProofHeirStorage();
+        require($.identityCommitment == bytes32(0), "Identity already registered");
+        $.identityCommitment = _identityCommitment;
         emit IdentityRegistered(msg.sender, _identityCommitment);
+    }
+
+    /**
+     * @notice Returns the stored identity commitment.
+     */
+    function identityCommitment() external view returns (bytes32) {
+        ProofHeirStorage storage $ = _getProofHeirStorage();
+        return $.identityCommitment;
     }
 
     /**
@@ -63,7 +85,8 @@ contract ProofHeir {
         address[] calldata tokens,
         address recipient
     ) external {
-        require(identityCommitment != bytes32(0), "Identity not registered");
+        ProofHeirStorage storage $ = _getProofHeirStorage();
+        require($.identityCommitment != bytes32(0), "Identity not registered");
         require(recipient != address(0), "Invalid recipient");
         
         // Circuit serializes each byte as a 32-byte field element
@@ -78,7 +101,7 @@ contract ProofHeir {
         // --- 2. Security Check: Identity Binding ---
         // Prevents using a death certificate of a random person.
         bytes32 proofIdCommitment = _extractBytes32(publicInputs, 52);
-        require(proofIdCommitment == identityCommitment, "Proof identity mismatch");
+        require(proofIdCommitment == $.identityCommitment, "Proof identity mismatch");
 
         // --- 3. Security Check: Source Binding ---
         // Prevents using a fake server (Man-in-the-Middle with valid TLS but wrong host).
