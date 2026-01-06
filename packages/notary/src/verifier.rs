@@ -1,5 +1,5 @@
-use crate::types::{received_commitments, ZKProofBundle};
-use noir::barretenberg::verify::{get_ultra_honk_verification_key, verify_ultra_honk};
+use crate::types::{received_commitments, serialize_public_inputs_for_solidity, ZKProofBundle};
+use noir::barretenberg::verify::{get_ultra_honk_verification_key};
 use serde_json::Value;
 use tlsn::{
     config::{CertificateDer, ProtocolConfigValidator, RootCertStore},
@@ -11,15 +11,34 @@ use tlsn::{
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 use tokio_util::compat::TokioAsyncReadCompatExt;
 use tracing::instrument;
+use alloy::{
+    network::EthereumWallet,
+    primitives::{Address, Bytes, FixedBytes},
+    providers::ProviderBuilder,
+    signers::local::PrivateKeySigner,
+    sol,
+};
+use std::env;
 
 // Constants from prover
 const MAX_SENT_DATA: usize = 1 << 12;
 const MAX_RECV_DATA: usize = 1 << 14;
 
+// Define the ProofHeir contract interface
+sol! {
+    #[sol(rpc)]
+    contract ProofHeir {
+        function proveDeathAndRegisterHeir(bytes calldata proof, bytes32[] calldata publicInputs) external;
+        
+        event HeirRegistered(address indexed owner, address indexed heir);
+    }
+}
+
 #[instrument(skip(socket, extra_socket))]
 pub async fn verifier<T: AsyncWrite + AsyncRead + Send + Sync + Unpin + 'static>(
     socket: T,
     mut extra_socket: T,
+    testator_address: [u8; 20],
 ) -> Result<PartialTranscript, Box<dyn std::error::Error>> {
     // Limits matching prover
     let protocol_config_validator = ProtocolConfigValidator::builder()
@@ -139,16 +158,88 @@ pub async fn verifier<T: AsyncWrite + AsyncRead + Send + Sync + Unpin + 'static>
     
     tracing::info!("✅ ZK Proof Public Input matches MPC-TLS commitment!");
 
-    // Verify the proof validity
-    let is_valid = verify_ultra_honk(proof, vk)
-        .map_err(|e| format!("ZKProof Verification failed: {}", e))?;
-        
-    if !is_valid {
-        tracing::error!("❌ ZK Proof verification failed (invalid proof)");
-        return Err("ZK Proof invalid".into());
-    }
+    // ========================================================================
+    // SEND TRANSACTION TO VERIFY PROOF AND REGISTER HEIR ON-CHAIN
+    // ========================================================================
     
-    tracing::info!("✅ ZK Proof successfully verified");
+    // Read configuration from environment
+    let rpc_url = env::var("RPC_URL")
+        .unwrap_or_else(|_| "http://localhost:8545".to_string());
+    let private_key = env::var("VERIFIER_PRIVATE_KEY")
+        .map_err(|_| "VERIFIER_PRIVATE_KEY not set in environment")?;
+    
+    // Convert testator address to Address type
+    let testator_addr = Address::from_slice(&testator_address);
+    
+    tracing::info!("📡 Calling proveDeathAndRegisterHeir on delegated account: 0x{}", hex::encode(&testator_address));
+    tracing::info!("🔗 RPC URL: {}", rpc_url);
+    
+    // Create signer from private key
+    let signer: PrivateKeySigner = private_key.parse()
+        .map_err(|e| format!("Invalid private key: {}", e))?;
+    
+    let wallet = EthereumWallet::from(signer);
+    
+    tracing::info!("🔑 Using verifier wallet: {}", wallet.default_signer().address());
+    
+    // Create provider with signer
+    let provider = ProviderBuilder::new()
+        .with_recommended_fillers()
+        .wallet(wallet)
+        .on_http(rpc_url.parse()?);
+    
+    // Serialize public inputs to Solidity format (116 fields)
+    let public_inputs_hex = serialize_public_inputs_for_solidity(
+        msg.public_inputs.recipient,
+        msg.public_inputs.server_hash,
+        msg.public_inputs.id_commitment,
+        &status_commitment_from_proof,
+    )?;
+    
+    // Convert to FixedBytes<32> array for contract call
+    let public_inputs_bytes: Vec<FixedBytes<32>> = public_inputs_hex
+        .iter()
+        .map(|hex_str| {
+            let hex_str = hex_str.trim_start_matches("0x");
+            let bytes = hex::decode(hex_str).expect("Invalid hex in public inputs");
+            FixedBytes::<32>::from_slice(&bytes)
+        })
+        .collect();
+    
+    // Convert proof to Bytes
+    let proof_bytes = Bytes::from(proof.clone());
+    
+    // Create contract instance pointing to the TESTATOR'S DELEGATED ACCOUNT
+    // This is the key change: we call the function on the testator's account,
+    // not on the ProofHeir contract address directly
+    let contract = ProofHeir::new(testator_addr, &provider);
+    
+    // Send transaction to register heir on-chain
+    tracing::info!("🔐 Sending transaction: proveDeathAndRegisterHeir()...");
+    
+    let tx_builder = contract.proveDeathAndRegisterHeir(proof_bytes, public_inputs_bytes);
+    
+    // Send the transaction
+    let pending_tx = tx_builder.send().await
+        .map_err(|e| format!("Failed to send transaction: {}", e))?;
+    
+    let tx_hash = *pending_tx.tx_hash();
+    tracing::info!("📝 Transaction sent! Hash: {:?}", tx_hash);
+    
+    // Wait for transaction confirmation
+    tracing::info!("⏳ Waiting for transaction confirmation...");
+    let receipt = pending_tx.get_receipt().await
+        .map_err(|e| format!("Failed to get transaction receipt: {}", e))?;
+    
+    if receipt.status() {
+        tracing::info!("✅ Transaction confirmed in block: {}", receipt.block_number.unwrap_or(0));
+        tracing::info!("✅ On-chain proof verification succeeded!");
+        tracing::info!("✅ Heir registered in testator's delegated account storage!");
+        tracing::info!("⛽ Gas used: {}", receipt.gas_used);
+    } else {
+        tracing::error!("❌ Transaction reverted!");
+        return Err("Transaction was reverted by the contract".into());
+    }
 
     Ok(transcript)
 }

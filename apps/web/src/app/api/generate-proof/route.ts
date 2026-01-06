@@ -26,12 +26,12 @@ import { NextResponse } from 'next/server'
 export async function POST(request: Request) {
     try {
         const body = await request.json()
-        const { recipient, nuip, salt } = body
+        const { recipient, nuip, salt, testator_address } = body
 
         // Validate inputs
-        if (!recipient || !nuip || !salt) {
+        if (!recipient || !nuip || !salt || !testator_address) {
             return NextResponse.json(
-                { error: 'Missing required parameters: recipient, nuip, salt' },
+                { error: 'Missing required parameters: recipient, nuip, salt, testator_address' },
                 { status: 400 }
             )
         }
@@ -40,6 +40,14 @@ export async function POST(request: Request) {
         if (!/^0x[0-9a-fA-F]{40}$/.test(recipient)) {
             return NextResponse.json(
                 { error: 'Invalid recipient address format' },
+                { status: 400 }
+            )
+        }
+
+        // Validate testator_address format (0x + 40 hex chars)
+        if (!/^0x[0-9a-fA-F]{40}$/.test(testator_address)) {
+            return NextResponse.json(
+                { error: 'Invalid testator address format' },
                 { status: 400 }
             )
         }
@@ -61,18 +69,21 @@ export async function POST(request: Request) {
         }
 
         // Call Rust API server
-        console.log('Calling Rust API server at http://localhost:3001/api/generate-proof')
-
         const rustApiUrl = process.env.RUST_API_URL || 'http://localhost:3001'
+
+        // Helper to strip 0x prefix for Rust API
+        const strip0x = (hex: string) => hex.startsWith('0x') ? hex.slice(2) : hex
+
         const response = await fetch(`${rustApiUrl}/api/generate-proof`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                recipient,
+                recipient: strip0x(recipient),
                 nuip,
-                salt,
+                salt: strip0x(salt),
+                testator_address: strip0x(testator_address),
             }),
         })
 

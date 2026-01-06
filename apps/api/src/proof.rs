@@ -10,6 +10,8 @@ pub struct ProofRequest {
     pub nuip: String,
     /// Salt for identity commitment (hex string without 0x prefix)
     pub salt: String,
+    /// Ethereum address of the testator (delegated account)
+    pub testator_address: String,
 }
 
 /// Response body for proof generation
@@ -90,14 +92,37 @@ pub async fn generate_proof(
             )
         })?;
 
+    // Validate and parse testator address (20 bytes) - accept with or without 0x
+    let testator_address = hex::decode(strip_0x(&request.testator_address))
+        .map_err(|e| {
+            tracing::error!("Invalid testator address hex: {}", e);
+            (
+                StatusCode::BAD_REQUEST,
+                Json(ErrorResponse {
+                    error: format!("Invalid testator address: {}", e),
+                }),
+            )
+        })?
+        .try_into()
+        .map_err(|v: Vec<u8>| {
+            tracing::error!("Testator address must be exactly 20 bytes, got {}", v.len());
+            (
+                StatusCode::BAD_REQUEST,
+                Json(ErrorResponse {
+                    error: format!("Testator address must be exactly 20 bytes, got {}", v.len()),
+                }),
+            )
+        })?;
+
     tracing::info!("✅ Input validation passed");
     tracing::info!("   Recipient: 0x{}", hex::encode(&recipient));
+    tracing::info!("   Testator: 0x{}", hex::encode(&testator_address));
     // NUIP and salt are sensitive - not logged
 
     // Generate proof using the notary library
     tracing::info!("🚀 Starting proof generation...");
     
-    let result = notary::proof_gen::generate_death_proof(recipient, request.nuip, salt)
+    let result = notary::proof_gen::generate_death_proof(recipient, request.nuip, salt, testator_address)
         .await
         .map_err(|e| {
             tracing::error!("Proof generation failed: {}", e);

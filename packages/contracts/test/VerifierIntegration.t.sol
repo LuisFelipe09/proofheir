@@ -86,12 +86,12 @@ contract VerifierIntegrationTest is Test {
         vm.signAndAttachDelegation(address(proofHeir), BOB_PK);
         
         vm.prank(BOB_ADDRESS);
-        ProofHeir(BOB_ADDRESS).register(IDENTITY_COMMITMENT);
+        ProofHeir(BOB_ADDRESS).registerIdentity(IDENTITY_COMMITMENT);
 
         vm.startPrank(ALICE_ADDRESS);
         // Should revert because the proof is invalid
         vm.expectRevert(); // Generic revert - proof verification will fail
-        ProofHeir(BOB_ADDRESS).claim(invalidProof, publicInputs, tokens, ALICE_ADDRESS);
+        ProofHeir(BOB_ADDRESS).proveDeathAndRegisterHeir(invalidProof, publicInputs);
         vm.stopPrank();
     }
 
@@ -166,18 +166,22 @@ contract VerifierIntegrationTest is Test {
         
         // Bob registers his identity commitment on his delegated account
         vm.prank(BOB_ADDRESS);
-        ProofHeir(BOB_ADDRESS).register(idCommitment);
+        ProofHeir(BOB_ADDRESS).registerIdentity(idCommitment);
         
         // Verify registration worked
-        assertEq(ProofHeir(BOB_ADDRESS).identityCommitment(), idCommitment, "Identity not registered");
+        assertEq(ProofHeir(BOB_ADDRESS).getIdentityCommitment(), idCommitment, "Identity not registered");
         
         // Check initial balances
         assertEq(tokenA.balanceOf(BOB_ADDRESS), 1000, "Bob should have 1000 tokens");
         assertEq(tokenA.balanceOf(proofRecipient), 0, "Recipient should have 0 tokens initially");
         
-        // Anyone can call claim with the valid ZK proof
+        // Step 1: Register heir with valid ZK proof (anyone can call this)
         vm.prank(ALICE_ADDRESS);
-        ProofHeir(BOB_ADDRESS).claim(proof, publicInputs, tokens, proofRecipient);
+        ProofHeir(BOB_ADDRESS).proveDeathAndRegisterHeir(proof, publicInputs);
+        
+        // Step 2: Claim and transfer tokens to the registered heir
+        vm.prank(ALICE_ADDRESS);
+        ProofHeir(BOB_ADDRESS).claimInheritance(tokens);
         
         // Verify tokens transferred to the proof recipient
         assertEq(tokenA.balanceOf(BOB_ADDRESS), 0, "Bob should have 0 tokens after claim");

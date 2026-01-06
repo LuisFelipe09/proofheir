@@ -1,20 +1,17 @@
 'use client'
 
 import { useState } from 'react'
-import { useAccount, useReadContract, usePublicClient } from 'wagmi'
+import { useAccount, usePublicClient } from 'wagmi'
 import { useWallets } from '@privy-io/react-auth'
-import { encodeFunctionData, pad, formatUnits, type Address, type Hex } from 'viem'
+import { encodeFunctionData, type Address, type Hex } from 'viem'
 import { CONTRACTS } from '../config/contracts'
 
 const PROOF_HEIR_ABI = [
     {
         "type": "function",
-        "name": "claim",
+        "name": "claimInheritance",
         "inputs": [
-            { "name": "proof", "type": "bytes" },
-            { "name": "publicInputs", "type": "bytes32[]" },
-            { "name": "tokens", "type": "address[]" },
-            { "name": "recipient", "type": "address" }
+            { "name": "tokens", "type": "address[]" }
         ],
         "outputs": [],
         "stateMutability": "external"
@@ -27,15 +24,14 @@ export function ClaimCard() {
     const publicClient = usePublicClient()
 
     const [testatorAddress, setTestatorAddress] = useState('')
-    const [recipientAddress, setRecipientAddress] = useState('')
     const [tokenAddress, setTokenAddress] = useState(CONTRACTS.MOCK_TOKEN as string)
     const [authJson, setAuthJson] = useState('')
 
-    // New fields for proof generation
+    // Fields for proof generation
     const [nuipInput, setNuipInput] = useState('')
     const [saltInput, setSaltInput] = useState('0x1111111111111111111111111111111111111111111111111111111111111111')
 
-    const [status, setStatus] = useState<'idle' | 'generating' | 'executing' | 'success' | 'error'>('idle')
+    const [status, setStatus] = useState<'idle' | 'generating' | 'waiting' | 'executing' | 'success' | 'error'>('idle')
     const [errorMsg, setErrorMsg] = useState('')
     const [txHash, setTxHash] = useState<string | null>(null)
 
@@ -50,45 +46,59 @@ export function ClaimCard() {
         }
 
         try {
+            // Validate inputs
+            if (!testatorAddress || testatorAddress.trim() === '') {
+                setErrorMsg('Por favor ingresa la dirección del testador')
+                setStatus('error')
+                return
+            }
+
+            if (!nuipInput || nuipInput.trim() === '') {
+                setErrorMsg('Por favor ingresa el NUIP')
+                setStatus('error')
+                return
+            }
+
+            // ========================================================================
+            // STEP 1: Generate ZK Proof (Verifier registers heir on-chain)
+            // ========================================================================
             setStatus('generating')
 
-            // 1. Generate ZK Proof via API
-            const recipient = (recipientAddress || connectedAddress) as Address
+            const recipient = connectedAddress as Address
+
             const proofRes = await fetch('/api/generate-proof', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    recipient,
+                    recipient: recipient,
                     nuip: nuipInput,
                     salt: saltInput,
+                    testator_address: testatorAddress,
                 }),
             })
-
 
             if (!proofRes.ok) {
                 const errorData = await proofRes.json()
                 throw new Error(errorData.error || 'Failed to generate proof')
             }
 
-            const { proof: rawProof, public_inputs: rawPublicInputs } = await proofRes.json()
+            const proofData = await proofRes.json()
 
-            // Ensure proof has 0x prefix
-            const proof = rawProof.startsWith('0x') ? rawProof : `0x${rawProof}`
+            // ========================================================================
+            // STEP 2: Wait for heir registration (optional but recommended)
+            // ========================================================================
+            setStatus('waiting')
 
-            // Ensure all public inputs have 0x prefix
-            const publicInputs = rawPublicInputs.map((input: string) =>
-                input.startsWith('0x') ? input : `0x${input}`
-            )
+            // Give the verifier some time to register the heir on-chain
+            // In production, you might want to poll the contract to check if heir is registered
+            await new Promise(resolve => setTimeout(resolve, 3000))
 
-            console.log('Proof generated:', {
-                proofLength: proof.length,
-                inputsCount: publicInputs.length,
-                firstInput: publicInputs[0]
-            })
-
+            // ========================================================================
+            // STEP 3: Call claimInheritance(tokens) to transfer assets
+            // ========================================================================
             setStatus('executing')
 
-            // 2. Parse authorization (existing logic)
+            // Parse authorization (existing logic)
             let authorization
             if (authJson && !authJson.trim().startsWith('{')) {
                 // Si no es JSON válido lo ignoramos
@@ -104,22 +114,17 @@ export function ClaimCard() {
                         yParity: Number(rawAuth.yParity ?? (rawAuth.v === 28 ? 1 : rawAuth.v === 27 ? 0 : (rawAuth.v ?? 0)))
                     }
                 } catch (e) {
-                    console.warn("JSON de auth inválido, ignorando...", e)
+                    // Invalid JSON, ignore
                 }
             }
 
             const tokens = [tokenAddress as Address]
 
-            // 3. Encode the function call with real proof
+            // Encode the function call - NOW WITHOUT proof and publicInputs
             const data = encodeFunctionData({
                 abi: PROOF_HEIR_ABI,
-                functionName: 'claim',
-                args: [
-                    proof as Hex,
-                    publicInputs as Hex[],
-                    tokens,
-                    recipient
-                ]
+                functionName: 'claimInheritance',
+                args: [tokens]
             })
 
             // Hablamos directamente con el provider de la embedded wallet
@@ -145,7 +150,6 @@ export function ClaimCard() {
             setTxHash(hash)
             setStatus('success')
         } catch (e: any) {
-            console.error(e)
             setErrorMsg(e.message || 'Error al ejecutar el reclamo')
             setStatus('error')
         }
@@ -155,10 +159,11 @@ export function ClaimCard() {
 
     return (
         <div className="w-full" style={{ color: 'black' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '1rem' }}>Execute Claim (Privy Native)</h2>
+            <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '1rem' }}>Execute Claim (Two-Step Flow)</h2>
 
             <p style={{ fontSize: '0.875rem', color: '#4b5563', marginBottom: '1.5rem' }}>
-                Ejecuta la herencia usando la delegación EIP-7702 directamente desde tu wallet.
+                Paso 1: Genera la prueba ZK (el verifier registra al heredero on-chain automáticamente).<br />
+                Paso 2: Ejecuta claimInheritance para transferir los activos.
             </p>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
@@ -214,7 +219,7 @@ export function ClaimCard() {
 
             <button
                 onClick={handleClaim}
-                disabled={status === 'generating' || status === 'executing'}
+                disabled={status === 'generating' || status === 'waiting' || status === 'executing'}
                 style={{
                     width: '100%',
                     padding: '12px',
@@ -223,10 +228,13 @@ export function ClaimCard() {
                     color: 'white',
                     backgroundColor: status === 'success' ? '#16a34a' : status === 'error' ? '#dc2626' : '#4f46e5',
                     border: 'none',
-                    cursor: (status === 'generating' || status === 'executing') ? 'not-allowed' : 'pointer'
+                    cursor: (status === 'generating' || status === 'waiting' || status === 'executing') ? 'not-allowed' : 'pointer'
                 }}
             >
-                {status === 'generating' ? 'Generando Prueba...' : status === 'executing' ? 'Ejecutando Claim...' : 'Confirmar y Ejecutar'}
+                {status === 'generating' ? '🔐 Generando Prueba ZK...' :
+                    status === 'waiting' ? '⏳ Esperando Registro On-Chain...' :
+                        status === 'executing' ? '💸 Transfiriendo Activos...' :
+                            '🚀 Iniciar Reclamo'}
             </button>
 
             {status === 'success' && txHash && (

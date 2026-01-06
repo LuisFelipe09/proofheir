@@ -91,13 +91,17 @@ contract ProofHeirTest is Test {
         // Bob signs delegation to ProofHeir
         vm.signAndAttachDelegation(address(proofHeir), BOB_PK);
 
-        // Register Bob's identity on his delegated account
+        // Bob registers his identity on his delegated account
         vm.prank(BOB_ADDRESS);
-        ProofHeir(BOB_ADDRESS).register(IDENTITY_COMMITMENT);
+        ProofHeir(BOB_ADDRESS).registerIdentity(IDENTITY_COMMITMENT);
 
-        // Alice claims inheritance
-        vm.startPrank(ALICE_ADDRESS);
-        ProofHeir(BOB_ADDRESS).claim(proof, publicInputs, tokens, recipient);
+        // Step 1: Register heir with ZK proof (anyone can call this)
+        vm.prank(ALICE_ADDRESS);
+        ProofHeir(BOB_ADDRESS).proveDeathAndRegisterHeir(proof, publicInputs);
+
+        // Step 2: Claim inheritance (transfer assets to registered heir)
+        vm.prank(ALICE_ADDRESS);
+        ProofHeir(BOB_ADDRESS).claimInheritance(tokens);
         vm.stopPrank();
 
         assertEq(tokenA.balanceOf(ALICE_ADDRESS), 1000);
@@ -123,12 +127,20 @@ contract ProofHeirTest is Test {
         vm.signAndAttachDelegation(address(proofHeir), BOB_PK);
         
         vm.prank(BOB_ADDRESS);
-        ProofHeir(BOB_ADDRESS).register(IDENTITY_COMMITMENT);
+        ProofHeir(BOB_ADDRESS).registerIdentity(IDENTITY_COMMITMENT);
 
-        // Attacker tries to claim using Alice's proof but redirecting to Attacker
-        vm.startPrank(attacker);
-        vm.expectRevert("Recipient does not match proof");
-        ProofHeir(BOB_ADDRESS).claim(proof, publicInputs, tokens, attacker);
-        vm.stopPrank();
+        // Step 1: Register the intended heir (Alice) with valid proof
+        vm.prank(ALICE_ADDRESS);
+        ProofHeir(BOB_ADDRESS).proveDeathAndRegisterHeir(proof, publicInputs);
+
+        // Step 2: Attacker tries to claim - the call succeeds because anyone can trigger it
+        // BUT the assets will go to Alice (the registered heir), not the attacker
+        vm.prank(attacker);
+        ProofHeir(BOB_ADDRESS).claimInheritance(tokens);
+
+        // Verify that Alice received the tokens, not the attacker
+        assertEq(tokenA.balanceOf(ALICE_ADDRESS), 1000, "Alice should receive tokens");
+        assertEq(tokenA.balanceOf(attacker), 0, "Attacker should not receive tokens");
+        assertEq(tokenA.balanceOf(BOB_ADDRESS), 0, "Bob should have 0 tokens");
     }
 }

@@ -32,6 +32,7 @@ pub async fn generate_death_proof(
     recipient: [u8; 20],
     nuip: String,
     salt: [u8; 32],
+    testator_address: [u8; 20],
 ) -> anyhow::Result<ProofGenerationResult> {
     // Configuration for the target server (Civil Registry Mock)
     // Use environment variable or default to Railway deployment
@@ -98,9 +99,9 @@ pub async fn generate_death_proof(
         .map_err(|e| anyhow::anyhow!("Prover error: {}", e))
     });
 
-    // Spawn verifier task
+    // Spawn verifier task - NOW WITH TESTATOR ADDRESS
     let verifier_handle = tokio::spawn(async move {
-        crate::verifier::verifier(verifier_socket, verifier_extra_socket)
+        crate::verifier::verifier(verifier_socket, verifier_extra_socket, testator_address)
             .await
             .map_err(|e| anyhow::anyhow!("Verifier error: {}", e))
     });

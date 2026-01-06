@@ -16,6 +16,21 @@ struct HealthResponse {
 
 #[tokio::main]
 async fn main() {
+    // Load .env file from workspace root
+    // Try multiple paths to find .env
+    let env_paths = vec![
+        "../../.env",
+        ".env",
+        "../.env",
+    ];
+    
+    for path in env_paths {
+        if dotenvy::from_path(path).is_ok() {
+            eprintln!("✅ Loaded .env from: {}", path);
+            break;
+        }
+    }
+    
     // Initialize tracing
     tracing_subscriber::registry()
         .with(

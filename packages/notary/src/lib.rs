@@ -19,6 +19,7 @@ pub use proof_gen::{generate_death_proof, ProofGenerationResult};
 /// * `recipient` - Ethereum address of the heir (20 bytes)
 /// * `nuip` - National ID number (e.g., "123456789")
 /// * `salt` - 32-byte salt for identity commitment
+/// * `testator_address` - Ethereum address of the testator (delegated account)
 /// 
 /// # Returns
 /// `SolidityProofBundle` containing hex-encoded proof and 116 public input fields
@@ -26,8 +27,9 @@ pub async fn generate_proof_for_contract(
     recipient: [u8; 20],
     nuip: String,
     salt: [u8; 32],
+    testator_address: [u8; 20],
 ) -> anyhow::Result<SolidityProofBundle> {
-    let result = proof_gen::generate_death_proof(recipient, nuip, salt).await?;
+    let result = proof_gen::generate_death_proof(recipient, nuip, salt, testator_address).await?;
     
     Ok(SolidityProofBundle {
         proof: hex::encode(&result.proof),

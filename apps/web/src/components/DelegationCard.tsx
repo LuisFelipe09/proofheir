@@ -63,7 +63,7 @@ export function DelegationCard() {
                     setDelegationStatus('success')
                 }
             } catch (e) {
-                console.error('Error checking delegation status:', e)
+                // Error checking delegation, will retry
             }
         }
         checkDelegation()
@@ -123,7 +123,6 @@ export function DelegationCard() {
             setDelegationStatus('success')
 
         } catch (e: any) {
-            console.error('❌ Delegation error:', e)
             setDelegationError(e.message || 'Error al delegar')
             setDelegationStatus('error')
         }
@@ -164,18 +163,16 @@ export function DelegationCard() {
                 )
             ).map(b => b.toString(16).padStart(2, '0')).join('')}`
 
-            console.log('📝 Registering identity commitment:', identityCommitment)
-
             // Encode the function call using viem for type safety
             const calldata = encodeFunctionData({
                 abi: [{
                     type: 'function',
-                    name: 'register',
+                    name: 'registerIdentity',
                     inputs: [{ name: '_identityCommitment', type: 'bytes32' }],
                     outputs: [],
                     stateMutability: 'nonpayable'
                 }],
-                functionName: 'register',
+                functionName: 'registerIdentity',
                 args: [identityCommitment as `0x${string}`]
             })
 
@@ -192,33 +189,27 @@ export function DelegationCard() {
 
             await publicClient.waitForTransactionReceipt({ hash: registerTx as `0x${string}` })
             setRegisterTxHash(registerTx as string)
-            console.log('✅ Register transaction confirmed:', registerTx)
 
             // Verify the commitment was stored correctly
             const storedCommitment = await publicClient.readContract({
                 address: embeddedWallet.address as Address,
                 abi: [{
                     type: 'function',
-                    name: 'identityCommitment',
+                    name: 'getIdentityCommitment',
                     inputs: [],
                     outputs: [{ name: '', type: 'bytes32' }],
                     stateMutability: 'view'
                 }],
-                functionName: 'identityCommitment'
+                functionName: 'getIdentityCommitment'
             })
 
-            console.log('🔍 Stored commitment:', storedCommitment)
-            console.log('✅ Expected commitment:', identityCommitment)
-
             if (storedCommitment === identityCommitment) {
-                console.log('✅ Identity commitment verified successfully!')
                 setRegistrationStatus('success')
             } else {
                 throw new Error('Identity commitment mismatch!')
             }
 
         } catch (e: any) {
-            console.error('❌ Registration error:', e)
             setRegistrationError(e.message || 'Error al registrar')
             setRegistrationStatus('error')
         }
