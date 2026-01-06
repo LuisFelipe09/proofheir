@@ -20,7 +20,25 @@ contract DeployProofHeir is Script {
         console.log("MockVerifier deployed at:", address(verifier));
 
         // 2. Deploy ProofHeir
-        string memory trustedServerDomain = "civil-registry-mock.onrender.com        "; // 40 chars
+        // Read trusted server domain from environment and pad to 40 characters
+        string memory baseDomain = vm.envString("CIVIL_REGISTRY_DOMAIN");
+        
+        // Pad domain to exactly 40 characters with spaces
+        bytes memory domainBytes = bytes(baseDomain);
+        require(domainBytes.length <= 40, "Domain too long (max 40 chars)");
+        
+        bytes memory paddedBytes = new bytes(40);
+        for (uint i = 0; i < domainBytes.length; i++) {
+            paddedBytes[i] = domainBytes[i];
+        }
+        for (uint i = domainBytes.length; i < 40; i++) {
+            paddedBytes[i] = bytes1(' '); // Pad with spaces
+        }
+        string memory trustedServerDomain = string(paddedBytes);
+        
+        console.log("Domain length:", bytes(trustedServerDomain).length);
+        console.log("Domain value:", trustedServerDomain);
+        
         ProofHeir proofHeir = new ProofHeir(address(verifier), trustedServerDomain);
         console.log("ProofHeir deployed at:", address(proofHeir));
 

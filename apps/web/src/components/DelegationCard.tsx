@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { usePrivy, useSign7702Authorization, useWallets } from '@privy-io/react-auth'
 import { useReadContract, usePublicClient } from 'wagmi'
-import { formatUnits, type Address, type Hex } from 'viem'
+import { formatUnits, encodeFunctionData, type Address, type Hex } from 'viem'
 import { useEffect } from 'react'
 import { CONTRACTS } from '../config/contracts'
 
@@ -142,16 +142,42 @@ export function DelegationCard() {
 
             if (!publicClient) throw new Error('Public client not available')
 
+            // Pad NUIP to 15 bytes to match Rust prover implementation
+            const nuipBytes = new TextEncoder().encode(nuipInput)
+            const nuipPadded = new Uint8Array(15)
+            nuipPadded.set(nuipBytes.slice(0, Math.min(nuipBytes.length, 15)))
+
+            // Convert salt hex string to bytes
+            const saltBytes = new Uint8Array(
+                saltInput.slice(2).match(/.{1,2}/g)!.map(byte => parseInt(byte, 16))
+            )
+
+            // Concatenate padded NUIP + salt
+            const combined = new Uint8Array(nuipPadded.length + saltBytes.length)
+            combined.set(nuipPadded)
+            combined.set(saltBytes, nuipPadded.length)
+
+            // Calculate identity commitment: SHA-256(padded_nuip || salt)
             const identityCommitment = `0x${Array.from(
                 new Uint8Array(
-                    await crypto.subtle.digest(
-                        'SHA-256',
-                        new TextEncoder().encode(nuipInput + saltInput)
-                    )
+                    await crypto.subtle.digest('SHA-256', combined)
                 )
             ).map(b => b.toString(16).padStart(2, '0')).join('')}`
 
             console.log('📝 Registering identity commitment:', identityCommitment)
+
+            // Encode the function call using viem for type safety
+            const calldata = encodeFunctionData({
+                abi: [{
+                    type: 'function',
+                    name: 'register',
+                    inputs: [{ name: '_identityCommitment', type: 'bytes32' }],
+                    outputs: [],
+                    stateMutability: 'nonpayable'
+                }],
+                functionName: 'register',
+                args: [identityCommitment as `0x${string}`]
+            })
 
             // Call register on the delegated account
             const provider = await embeddedWallet.getEthereumProvider()
@@ -160,7 +186,7 @@ export function DelegationCard() {
                 params: [{
                     from: embeddedWallet.address,
                     to: embeddedWallet.address, // Call self (delegated contract)
-                    data: `0xe1fa8e84${identityCommitment.slice(2)}` // register(bytes32) - correct selector
+                    data: calldata
                 }]
             })
 

@@ -34,14 +34,17 @@ pub async fn generate_death_proof(
     salt: [u8; 32],
 ) -> anyhow::Result<ProofGenerationResult> {
     // Configuration for the target server (Civil Registry Mock)
-    let host = "web-production-05160.up.railway.app";
+    // Use environment variable or default to Railway deployment
+    let host = std::env::var("CIVIL_REGISTRY_DOMAIN")
+        .unwrap_or_else(|_| "web-production-05160.up.railway.app".to_string());
     let port = 443;
-    let server_addr = tokio::net::lookup_host((host, port))
+    let server_addr = tokio::net::lookup_host((host.as_str(), port))
         .await?
         .next()
         .ok_or_else(|| anyhow::anyhow!("Failed to lookup host"))?;
     
-    let uri = "https://web-production-05160.up.railway.app/VigenciaCedula/consulta";
+    let uri = std::env::var("CIVIL_REGISTRY_URL")
+        .unwrap_or_else(|_| "https://web-production-05160.up.railway.app/VigenciaCedula/consulta".to_string());
 
     tracing::info!("🔍 Running pre-verification check...");
     
@@ -50,7 +53,7 @@ pub async fn generate_death_proof(
     let nuip_number: u64 = nuip.parse()
         .map_err(|_| anyhow::anyhow!("Invalid NUIP format"))?;
     
-    let res = client.post(uri)
+    let res = client.post(&uri)  // Use reference here
         .json(&serde_json::json!({
             "nuip": nuip_number,
             "ip": "143.137.96.53"
@@ -58,10 +61,14 @@ pub async fn generate_death_proof(
         .send()
         .await?;
 
-    let body: Value = res.json().await?;
-    tracing::info!("Server response: {:?}", body);
+    if !res.status().is_success() {
+        return Err(anyhow::anyhow!("Failed to query civil registry: {}", res.status()));
+    }
 
-    if let Some(vigencia) = body.get("vigencia").and_then(|v| v.as_str()) {
+    let response_data: serde_json::Value = res.json().await?;
+    tracing::info!("Server response: {:?}", response_data);
+
+    if let Some(vigencia) = response_data.get("vigencia").and_then(|v| v.as_str()) {
         if vigencia == "Vigente (Vivo)" {
             tracing::error!("❌ Pre-verification FAILED: Subject is 'Vigente (Vivo)'");
             anyhow::bail!("Cannot generate 'Proof of Death' - subject is alive");
@@ -83,7 +90,7 @@ pub async fn generate_death_proof(
             prover_socket,
             prover_extra_socket,
             &server_addr,
-            uri,
+            &uri,
             recipient,
             &nuip_for_prover,
             salt,
