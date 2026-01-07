@@ -7,8 +7,8 @@ export function WalletConnect() {
 
     if (!ready) {
         return (
-            <div style={{ backgroundColor: '#f3f4f6', padding: '0.5rem', borderRadius: '0.5rem' }}>
-                <div style={{ fontSize: '0.875rem' }}>Loading...</div>
+            <div className="px-4 py-2 bg-slate-800/50 border border-white/10 rounded-xl">
+                <div className="text-sm text-slate-400 animate-pulse">Loading...</div>
             </div>
         )
     }
@@ -18,16 +18,28 @@ export function WalletConnect() {
         const address = wallet?.address
 
         return (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', backgroundColor: '#f3f4f6', padding: '0.5rem', borderRadius: '0.5rem' }}>
-                <div style={{ fontSize: '0.875rem' }}>
-                    <div style={{ fontFamily: 'monospace' }}>{address?.slice(0, 6)}...{address?.slice(-4)}</div>
-                    <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
-                        {user.email?.address || 'Connected'}
+            <div className="flex items-center gap-3 bg-slate-800/80 backdrop-blur-sm border border-white/10 px-4 py-2.5 rounded-xl">
+                <div className="flex items-center gap-3">
+                    {/* Avatar */}
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-cyan-500 to-teal-500 flex items-center justify-center">
+                        <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                        </svg>
+                    </div>
+
+                    <div className="text-left">
+                        <div className="font-mono text-sm text-white font-medium">
+                            {address?.slice(0, 6)}...{address?.slice(-4)}
+                        </div>
+                        <div className="text-xs text-slate-400">
+                            {user.email?.address || 'Connected'}
+                        </div>
                     </div>
                 </div>
+
                 <button
                     onClick={logout}
-                    style={{ backgroundColor: '#ef4444', color: 'white', padding: '0.25rem 0.75rem', borderRadius: '0.25rem', border: 'none', cursor: 'pointer', fontSize: '0.875rem' }}
+                    className="ml-2 px-3 py-1.5 text-xs font-medium text-rose-400 hover:text-white hover:bg-rose-500/20 border border-rose-500/30 hover:border-rose-500/50 rounded-lg transition-all duration-200"
                 >
                     Disconnect
                 </button>
@@ -38,8 +50,11 @@ export function WalletConnect() {
     return (
         <button
             onClick={login}
-            style={{ backgroundColor: 'black', color: 'white', padding: '0.5rem 1rem', borderRadius: '0.5rem', border: 'none', cursor: 'pointer', transition: 'background-color 0.2s' }}
+            className="group flex items-center gap-2 bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white font-semibold px-5 py-2.5 rounded-xl transition-all duration-300 shadow-lg shadow-cyan-500/25 hover:shadow-cyan-500/40"
         >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+            </svg>
             Connect Wallet
         </button>
     )

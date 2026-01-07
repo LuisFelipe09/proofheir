@@ -27,7 +27,6 @@ export function ClaimCard() {
     const [tokenAddress, setTokenAddress] = useState(CONTRACTS.MOCK_TOKEN as string)
     const [authJson, setAuthJson] = useState('')
 
-    // Fields for proof generation
     const [nuipInput, setNuipInput] = useState('')
     const [saltInput, setSaltInput] = useState('0x1111111111111111111111111111111111111111111111111111111111111111')
 
@@ -36,32 +35,28 @@ export function ClaimCard() {
     const [txHash, setTxHash] = useState<string | null>(null)
 
     const handleClaim = async () => {
-        // Priorizar la embedded wallet de Privy para evitar MetaMask
         const embeddedWallet = wallets.find(w => w.walletClientType === 'privy') || wallets.find(w => w.address === connectedAddress)
 
         if (!embeddedWallet) {
-            setErrorMsg('Wallet de Privy no encontrada')
+            setErrorMsg('Privy wallet not found')
             setStatus('error')
             return
         }
 
         try {
-            // Validate inputs
             if (!testatorAddress || testatorAddress.trim() === '') {
-                setErrorMsg('Por favor ingresa la dirección del testador')
+                setErrorMsg('Please enter the testator address')
                 setStatus('error')
                 return
             }
 
             if (!nuipInput || nuipInput.trim() === '') {
-                setErrorMsg('Por favor ingresa el NUIP')
+                setErrorMsg('Please enter the NUIP')
                 setStatus('error')
                 return
             }
 
-            // ========================================================================
-            // STEP 1: Generate ZK Proof (Verifier registers heir on-chain)
-            // ========================================================================
+            // STEP 1: Generate ZK Proof
             setStatus('generating')
 
             const recipient = connectedAddress as Address
@@ -84,24 +79,15 @@ export function ClaimCard() {
 
             const proofData = await proofRes.json()
 
-            // ========================================================================
-            // STEP 2: Wait for heir registration (optional but recommended)
-            // ========================================================================
+            // STEP 2: Wait for heir registration
             setStatus('waiting')
-
-            // Give the verifier some time to register the heir on-chain
-            // In production, you might want to poll the contract to check if heir is registered
             await new Promise(resolve => setTimeout(resolve, 3000))
 
-            // ========================================================================
-            // STEP 3: Call claimInheritance(tokens) to transfer assets
-            // ========================================================================
+            // STEP 3: Call claimInheritance
             setStatus('executing')
 
-            // Parse authorization (existing logic)
             let authorization
             if (authJson && !authJson.trim().startsWith('{')) {
-                // Si no es JSON válido lo ignoramos
             } else if (authJson) {
                 try {
                     const rawAuth = JSON.parse(authJson)
@@ -114,30 +100,25 @@ export function ClaimCard() {
                         yParity: Number(rawAuth.yParity ?? (rawAuth.v === 28 ? 1 : rawAuth.v === 27 ? 0 : (rawAuth.v ?? 0)))
                     }
                 } catch (e) {
-                    // Invalid JSON, ignore
                 }
             }
 
             const tokens = [tokenAddress as Address]
 
-            // Encode the function call - NOW WITHOUT proof and publicInputs
             const data = encodeFunctionData({
                 abi: PROOF_HEIR_ABI,
                 functionName: 'claimInheritance',
                 args: [tokens]
             })
 
-            // Hablamos directamente con el provider de la embedded wallet
             const provider = await embeddedWallet.getEthereumProvider()
 
-            // Transacción básica
             const txParams: any = {
                 from: embeddedWallet.address,
                 to: testatorAddress,
                 data
             }
 
-            // Solo agregamos authorizationList si realmente existe una autorización
             if (authorization) {
                 txParams.authorizationList = [authorization]
             }
@@ -150,102 +131,186 @@ export function ClaimCard() {
             setTxHash(hash)
             setStatus('success')
         } catch (e: any) {
-            setErrorMsg(e.message || 'Error al ejecutar el reclamo')
+            setErrorMsg(e.message || 'Claim execution error')
             setStatus('error')
         }
     }
 
-    if (!isConnected) return null
+    if (!isConnected) return (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="w-16 h-16 bg-indigo-500/20 rounded-2xl flex items-center justify-center mb-4">
+                <svg className="w-8 h-8 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+            </div>
+            <h3 className="text-lg font-semibold text-white mb-2">Wallet Connection Required</h3>
+            <p className="text-slate-400 text-sm max-w-sm">Please connect your wallet to claim your inheritance.</p>
+        </div>
+    )
 
     return (
-        <div className="w-full" style={{ color: 'black' }}>
-            <h2 style={{ fontSize: '1.25rem', fontWeight: 'bold', marginBottom: '1rem' }}>Execute Claim (Two-Step Flow)</h2>
+        <div className="w-full">
+            {/* Info Banner */}
+            <div className="mb-6 p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
+                <div className="flex items-start gap-3">
+                    <svg className="w-5 h-5 text-indigo-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div className="text-sm text-indigo-200">
+                        <strong>Two-Step Process:</strong> First, generate ZK proof (auto-registers heir on-chain). Then, execute claim to transfer assets.
+                    </div>
+                </div>
+            </div>
 
-            <p style={{ fontSize: '0.875rem', color: '#4b5563', marginBottom: '1.5rem' }}>
-                Paso 1: Genera la prueba ZK (el verifier registra al heredero on-chain automáticamente).<br />
-                Paso 2: Ejecuta claimInheritance para transferir los activos.
-            </p>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginBottom: '1.5rem' }}>
+            {/* Form Fields */}
+            <div className="space-y-4 mb-6">
                 <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', marginBottom: '0.25rem' }}>Dirección del Testador</label>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Testator Address
+                    </label>
                     <input
                         type="text"
                         value={testatorAddress}
                         onChange={(e) => setTestatorAddress(e.target.value)}
                         placeholder="0x..."
-                        style={{ width: '100%', padding: '8px', border: '1px solid #d1d5db', borderRadius: '0.25rem', fontSize: '0.875rem', fontFamily: 'monospace' }}
+                        className="w-full p-3 bg-slate-700/50 border border-white/10 rounded-xl text-white placeholder-slate-500 font-mono text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                     />
                 </div>
+
                 <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', marginBottom: '0.25rem' }}>Token Address</label>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                        Token Address
+                    </label>
                     <input
                         type="text"
                         value={tokenAddress}
                         onChange={(e) => setTokenAddress(e.target.value)}
-                        style={{ width: '100%', padding: '8px', border: '1px solid #d1d5db', borderRadius: '0.25rem', fontSize: '0.875rem', fontFamily: 'monospace' }}
+                        className="w-full p-3 bg-slate-700/50 border border-white/10 rounded-xl text-white placeholder-slate-500 font-mono text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                     />
                 </div>
-                <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', marginBottom: '0.25rem' }}>NUIP (ID Nacional)</label>
-                    <input
-                        type="text"
-                        value={nuipInput}
-                        onChange={(e) => setNuipInput(e.target.value)}
-                        placeholder="123456789"
-                        style={{ width: '100%', padding: '8px', border: '1px solid #d1d5db', borderRadius: '0.25rem', fontSize: '0.875rem', fontFamily: 'monospace' }}
-                    />
+
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                            NUIP (ID Number)
+                        </label>
+                        <input
+                            type="text"
+                            value={nuipInput}
+                            onChange={(e) => setNuipInput(e.target.value)}
+                            placeholder="123456789"
+                            className="w-full p-3 bg-slate-700/50 border border-white/10 rounded-xl text-white placeholder-slate-500 font-mono text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-slate-300 mb-2">
+                            Salt (Hex)
+                        </label>
+                        <input
+                            type="text"
+                            value={saltInput}
+                            onChange={(e) => setSaltInput(e.target.value)}
+                            placeholder="0x1111..."
+                            className="w-full p-3 bg-slate-700/50 border border-white/10 rounded-xl text-white placeholder-slate-500 font-mono text-xs focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                        />
+                    </div>
                 </div>
+
                 <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', marginBottom: '0.25rem' }}>Salt (32 bytes hex)</label>
-                    <input
-                        type="text"
-                        value={saltInput}
-                        onChange={(e) => setSaltInput(e.target.value)}
-                        placeholder="0x1111..."
-                        style={{ width: '100%', padding: '8px', border: '1px solid #d1d5db', borderRadius: '0.25rem', fontSize: '0.725rem', fontFamily: 'monospace' }}
-                    />
-                </div>
-                <div>
-                    <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: '600', color: '#6b7280', marginBottom: '0.25rem' }}>Autorización EIP-7702 (JSON)</label>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                        EIP-7702 Authorization (JSON) <span className="text-slate-500 font-normal">- Optional</span>
+                    </label>
                     <textarea
                         value={authJson}
                         onChange={(e) => setAuthJson(e.target.value)}
                         placeholder='{"address": "0x...", "r": "0x...", ...}'
-                        style={{ width: '100%', padding: '8px', border: '1px solid #d1d5db', borderRadius: '0.25rem', fontSize: '0.725rem', fontFamily: 'monospace', height: '90px' }}
+                        className="w-full p-3 bg-slate-700/50 border border-white/10 rounded-xl text-white placeholder-slate-500 font-mono text-xs focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all h-24 resize-none"
                     />
                 </div>
             </div>
 
+            {/* Submit Button */}
             <button
                 onClick={handleClaim}
                 disabled={status === 'generating' || status === 'waiting' || status === 'executing'}
-                style={{
-                    width: '100%',
-                    padding: '12px',
-                    borderRadius: '0.5rem',
-                    fontWeight: '600',
-                    color: 'white',
-                    backgroundColor: status === 'success' ? '#16a34a' : status === 'error' ? '#dc2626' : '#4f46e5',
-                    border: 'none',
-                    cursor: (status === 'generating' || status === 'waiting' || status === 'executing') ? 'not-allowed' : 'pointer'
-                }}
+                className={`w-full py-3.5 px-4 rounded-xl font-semibold text-white transition-all flex items-center justify-center gap-2 ${status === 'success'
+                        ? 'bg-gradient-to-r from-emerald-600 to-emerald-500 shadow-lg shadow-emerald-500/25'
+                        : status === 'error'
+                            ? 'bg-gradient-to-r from-rose-600 to-rose-500'
+                            : status !== 'idle'
+                                ? 'bg-indigo-500/50 cursor-wait'
+                                : 'bg-gradient-to-r from-indigo-600 to-indigo-500 hover:from-indigo-500 hover:to-indigo-400 shadow-lg shadow-indigo-500/25'
+                    }`}
             >
-                {status === 'generating' ? '🔐 Generando Prueba ZK...' :
-                    status === 'waiting' ? '⏳ Esperando Registro On-Chain...' :
-                        status === 'executing' ? '💸 Transfiriendo Activos...' :
-                            '🚀 Iniciar Reclamo'}
+                {status === 'generating' && (
+                    <>
+                        <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Generating ZK Proof...
+                    </>
+                )}
+                {status === 'waiting' && (
+                    <>
+                        <svg className="w-5 h-5 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Waiting for On-Chain Registration...
+                    </>
+                )}
+                {status === 'executing' && (
+                    <>
+                        <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Transferring Assets...
+                    </>
+                )}
+                {status === 'idle' && (
+                    <>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        Execute Claim
+                    </>
+                )}
+                {status === 'success' && (
+                    <>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Claim Successful!
+                    </>
+                )}
+                {status === 'error' && 'Retry Claim'}
             </button>
 
+            {/* Success Message */}
             {status === 'success' && txHash && (
-                <div style={{ marginTop: '1rem', padding: '0.75rem', backgroundColor: '#f0fdf4', color: '#15803d', fontSize: '0.75rem', borderRadius: '0.25rem' }}>
-                    <strong>¡Éxito!</strong> Transacción enviada: {txHash}
+                <div className="mt-4 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                    <div className="flex items-center gap-2 text-emerald-400 mb-2">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        <strong>Success!</strong>
+                    </div>
+                    <div className="text-xs text-emerald-300/80 font-mono break-all">
+                        Transaction: {txHash}
+                    </div>
                 </div>
             )}
 
+            {/* Error Message */}
             {status === 'error' && (
-                <div style={{ marginTop: '1rem', padding: '0.75rem', backgroundColor: '#fef2f2', color: '#b91c1c', fontSize: '0.75rem', borderRadius: '0.25rem' }}>
-                    {errorMsg}
+                <div className="mt-4 p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl">
+                    <div className="flex items-start gap-2">
+                        <svg className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div className="text-sm text-rose-300">{errorMsg}</div>
+                    </div>
                 </div>
             )}
         </div>
