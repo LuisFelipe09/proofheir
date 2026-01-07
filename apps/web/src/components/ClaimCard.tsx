@@ -129,21 +129,48 @@ export function ClaimCard() {
 
             const provider = await embeddedWallet.getEthereumProvider()
 
-            const txParams: any = {
+            // First estimate gas to catch errors early
+            let gasEstimate: string
+            try {
+                gasEstimate = await provider.request({
+                    method: 'eth_estimateGas',
+                    params: [{
+                        from: embeddedWallet.address,
+                        to: testatorAddress,
+                        data
+                    }]
+                }) as string
+                console.log('Gas estimate:', gasEstimate)
+            } catch (gasError: any) {
+                console.warn('Gas estimation failed:', gasError)
+                throw new Error(`Transaction would fail: ${gasError?.message || 'Contract call reverted'}`)
+            }
+
+            const txParams = {
                 from: embeddedWallet.address,
                 to: testatorAddress,
-                data
+                data,
+                gas: gasEstimate
             }
+
+            console.log('Sending transaction:', txParams)
 
             const hash = await provider.request({
                 method: 'eth_sendTransaction',
                 params: [txParams]
             }) as string
 
+            console.log('Transaction hash:', hash)
             setTxHash(hash)
             setStatus('success')
         } catch (e: any) {
-            setErrorMsg(e.message || 'Claim execution error')
+            console.warn('Claim error:', e)
+            // Check if user rejected the transaction
+            if (e?.code === 4001 || e?.message?.includes('rejected') || e?.message?.includes('denied')) {
+                setErrorMsg('Transaction was rejected by user')
+            } else {
+                setErrorMsg(e.message || 'Claim execution error')
+            }
             setStatus('error')
         }
     }

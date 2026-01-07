@@ -193,21 +193,47 @@ export function DelegationCard() {
             })
 
             const provider = await embeddedWallet.getEthereumProvider()
+
+            const txParams = {
+                from: embeddedWallet.address,
+                to: embeddedWallet.address,
+                data: calldata
+            }
+
+            // First estimate gas to catch errors early
+            let gasEstimate: string
+            try {
+                gasEstimate = await provider.request({
+                    method: 'eth_estimateGas',
+                    params: [txParams]
+                }) as string
+                console.log('Gas estimate for registerIdentity:', gasEstimate)
+            } catch (gasError: any) {
+                console.warn('Gas estimation failed:', gasError)
+                throw new Error(`Transaction would fail: ${gasError?.message || 'Contract call reverted'}`)
+            }
+
+            console.log('Sending registerIdentity transaction:', txParams)
+
             const registerTx = await provider.request({
                 method: 'eth_sendTransaction',
-                params: [{
-                    from: embeddedWallet.address,
-                    to: embeddedWallet.address,
-                    data: calldata
-                }]
+                params: [{ ...txParams, gas: gasEstimate }]
             })
+
+            console.log('Transaction hash:', registerTx)
 
             await publicClient.waitForTransactionReceipt({ hash: registerTx as `0x${string}` })
             setRegisterTxHash(registerTx as string)
             setRegistrationStatus('success')
 
         } catch (e: any) {
-            setRegistrationError(e.message || 'Registration error')
+            console.warn('Registration error:', e)
+            // Check if user rejected the transaction
+            if (e?.code === 4001 || e?.message?.includes('rejected') || e?.message?.includes('denied')) {
+                setRegistrationError('Transaction was rejected by user')
+            } else {
+                setRegistrationError(e.message || 'Registration error')
+            }
             setRegistrationStatus('error')
         }
     }
@@ -602,10 +628,10 @@ function StepIndicator({ steps, currentStep }: { steps: { id: string; title: str
                     <div key={step.id} className="relative flex flex-col items-center z-10">
                         <div
                             className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 ${index < currentStep
-                                    ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-lg shadow-emerald-500/30'
-                                    : index === currentStep
-                                        ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-500/30 ring-4 ring-cyan-500/20'
-                                        : 'bg-slate-700 text-slate-400'
+                                ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-lg shadow-emerald-500/30'
+                                : index === currentStep
+                                    ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-500/30 ring-4 ring-cyan-500/20'
+                                    : 'bg-slate-700 text-slate-400'
                                 }`}
                         >
                             {index < currentStep ? (
