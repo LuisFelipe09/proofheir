@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAccount, usePublicClient } from 'wagmi'
 import { usePrivy, useWallets } from '@privy-io/react-auth'
 import { encodeFunctionData, type Address, type Hex } from 'viem'
@@ -16,6 +16,13 @@ const PROOF_HEIR_ABI = [
         ],
         "outputs": [],
         "stateMutability": "external"
+    },
+    {
+        "type": "function",
+        "name": "getRegisteredHeir",
+        "inputs": [],
+        "outputs": [{ "name": "", "type": "address" }],
+        "stateMutability": "view"
     }
 ] as const
 
@@ -34,12 +41,55 @@ export function ClaimCard() {
     const [tokenAddresses, setTokenAddresses] = useState<string[]>([])
     const [newToken, setNewToken] = useState('')
 
-    // NUIP still needs manual input
+    // NUIP still needs manual input (only required if heir not registered)
     const [nuipInput, setNuipInput] = useState('')
 
-    const [status, setStatus] = useState<'idle' | 'generating' | 'waiting' | 'executing' | 'success' | 'error'>('idle')
+    // Heir registration status
+    const [registeredHeir, setRegisteredHeir] = useState<string | null>(null)
+    const [isHeirRegistered, setIsHeirRegistered] = useState(false)
+    const [checkingHeir, setCheckingHeir] = useState(false)
+
+    const [status, setStatus] = useState<'idle' | 'checking' | 'generating' | 'waiting' | 'executing' | 'success' | 'error'>('idle')
     const [errorMsg, setErrorMsg] = useState('')
     const [txHash, setTxHash] = useState<string | null>(null)
+
+    // Check if heir is already registered when testator address changes
+    useEffect(() => {
+        const checkHeirStatus = async () => {
+            if (!testatorAddress || !testatorAddress.startsWith('0x') || testatorAddress.length !== 42 || !publicClient) {
+                setRegisteredHeir(null)
+                setIsHeirRegistered(false)
+                return
+            }
+
+            setCheckingHeir(true)
+            try {
+                const heir = await publicClient.readContract({
+                    address: testatorAddress as Address,
+                    abi: PROOF_HEIR_ABI,
+                    functionName: 'getRegisteredHeir',
+                })
+
+                const heirAddress = heir as string
+                setRegisteredHeir(heirAddress)
+
+                // Check if the connected address is the registered heir
+                if (heirAddress && heirAddress !== '0x0000000000000000000000000000000000000000' && connectedAddress) {
+                    setIsHeirRegistered(heirAddress.toLowerCase() === connectedAddress.toLowerCase())
+                } else {
+                    setIsHeirRegistered(false)
+                }
+            } catch (e) {
+                console.log('Could not check heir status:', e)
+                setRegisteredHeir(null)
+                setIsHeirRegistered(false)
+            } finally {
+                setCheckingHeir(false)
+            }
+        }
+
+        checkHeirStatus()
+    }, [testatorAddress, connectedAddress, publicClient])
 
     const addToken = () => {
         if (newToken && newToken.startsWith('0x') && !tokenAddresses.includes(newToken)) {
@@ -68,57 +118,64 @@ export function ClaimCard() {
                 return
             }
 
-            if (!userEmail || !isValidEmail(userEmail)) {
-                setErrorMsg('Your account email is required. Please log in with email.')
-                setStatus('error')
-                return
-            }
-
-            if (!nuipInput || nuipInput.trim() === '') {
-                setErrorMsg('Please enter the NUIP')
-                setStatus('error')
-                return
-            }
-
             if (tokenAddresses.length === 0) {
                 setErrorMsg('Please add at least one token to claim')
                 setStatus('error')
                 return
             }
 
-            // STEP 1: Generate ZK Proof
-            setStatus('generating')
+            // If heir is already registered and it's the connected wallet, skip ZK proof
+            if (isHeirRegistered) {
+                console.log('Heir already registered, skipping ZK proof generation')
+                setStatus('executing')
+            } else {
+                // Need to generate ZK proof first
+                if (!userEmail || !isValidEmail(userEmail)) {
+                    setErrorMsg('Your account email is required. Please log in with email.')
+                    setStatus('error')
+                    return
+                }
 
-            const recipient = connectedAddress as Address
+                if (!nuipInput || nuipInput.trim() === '') {
+                    setErrorMsg('Please enter the NUIP')
+                    setStatus('error')
+                    return
+                }
 
-            // Convert email to salt (using the logged-in user's email)
-            const salt = await emailToSalt(userEmail)
+                // STEP 1: Generate ZK Proof
+                setStatus('generating')
 
-            const proofRes = await fetch('/api/generate-proof', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    recipient: recipient,
-                    nuip: nuipInput,
-                    salt: salt,
-                    testator_address: testatorAddress,
-                }),
-            })
+                const recipient = connectedAddress as Address
 
-            if (!proofRes.ok) {
-                const errorData = await proofRes.json()
-                throw new Error(errorData.error || 'Failed to generate proof')
+                // Convert email to salt (using the logged-in user's email)
+                const salt = await emailToSalt(userEmail)
+
+                const proofRes = await fetch('/api/generate-proof', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        recipient: recipient,
+                        nuip: nuipInput,
+                        salt: salt,
+                        testator_address: testatorAddress,
+                    }),
+                })
+
+                if (!proofRes.ok) {
+                    const errorData = await proofRes.json()
+                    throw new Error(errorData.error || 'Failed to generate proof')
+                }
+
+                const proofData = await proofRes.json()
+
+                // STEP 2: Wait for heir registration
+                setStatus('waiting')
+                await new Promise(resolve => setTimeout(resolve, 3000))
+
+                setStatus('executing')
             }
 
-            const proofData = await proofRes.json()
-
-            // STEP 2: Wait for heir registration
-            setStatus('waiting')
-            await new Promise(resolve => setTimeout(resolve, 3000))
-
             // STEP 3: Call claimInheritance
-            setStatus('executing')
-
             const tokens = tokenAddresses.map(t => t as Address)
 
             const data = encodeFunctionData({
@@ -245,6 +302,33 @@ export function ClaimCard() {
                                 placeholder="0x..."
                                 className="w-full p-3 bg-slate-700/50 border border-white/10 rounded-xl text-white placeholder-slate-500 font-mono text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                             />
+                            {/* Heir Status Indicator */}
+                            {testatorAddress && testatorAddress.length === 42 && (
+                                <div className="mt-2">
+                                    {checkingHeir ? (
+                                        <p className="text-xs text-slate-400 flex items-center gap-2">
+                                            <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                            </svg>
+                                            Checking heir status...
+                                        </p>
+                                    ) : isHeirRegistered ? (
+                                        <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
+                                            <p className="text-xs text-emerald-300 flex items-center gap-2">
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                </svg>
+                                                You are already registered as heir! No ZK proof needed.
+                                            </p>
+                                        </div>
+                                    ) : registeredHeir && registeredHeir !== '0x0000000000000000000000000000000000000000' ? (
+                                        <p className="text-xs text-amber-400">
+                                            ⚠️ Another heir is registered: {registeredHeir.slice(0, 10)}...
+                                        </p>
+                                    ) : null}
+                                </div>
+                            )}
                         </div>
 
                         {/* Token List */}
@@ -279,21 +363,24 @@ export function ClaimCard() {
                             </div>
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-slate-300 mb-2">
-                                Testator's NUIP (ID Number)
-                            </label>
-                            <input
-                                type="text"
-                                value={nuipInput}
-                                onChange={(e) => setNuipInput(e.target.value)}
-                                placeholder="e.g. 12345678"
-                                className="w-full p-3 bg-slate-700/50 border border-white/10 rounded-xl text-white placeholder-slate-500 font-mono text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                            />
-                            <p className="text-xs text-slate-500 mt-1">
-                                The testator should have shared this with you.
-                            </p>
-                        </div>
+                        {/* NUIP - Only show if heir not already registered */}
+                        {!isHeirRegistered && (
+                            <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-2">
+                                    Testator's NUIP (ID Number)
+                                </label>
+                                <input
+                                    type="text"
+                                    value={nuipInput}
+                                    onChange={(e) => setNuipInput(e.target.value)}
+                                    placeholder="e.g. 12345678"
+                                    className="w-full p-3 bg-slate-700/50 border border-white/10 rounded-xl text-white placeholder-slate-500 font-mono text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                                />
+                                <p className="text-xs text-slate-500 mt-1">
+                                    The testator should have shared this with you.
+                                </p>
+                            </div>
+                        )}
                     </div>
 
                     {/* Submit Button */}
@@ -336,7 +423,7 @@ export function ClaimCard() {
                                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                                 </svg>
-                                Claim Inheritance
+                                {isHeirRegistered ? 'Claim Inheritance' : 'Verify & Claim'}
                             </>
                         )}
                     </button>
