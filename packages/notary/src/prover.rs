@@ -11,7 +11,7 @@ use k256::sha2::{Digest, Sha256};
 use serde_json::Value;
 use noir::{
     barretenberg::{
-        prove::prove_ultra_honk, srs::setup_srs_from_bytecode,
+        prove::prove_ultra_honk_keccak, srs::setup_srs_from_bytecode, verify::get_ultra_honk_verification_key,
     },
     witness::from_vec_str_to_witness_map,
 };
@@ -19,7 +19,6 @@ use spansy::{
     http::{BodyContent, Responses},
     Spanned,
 };
-// Removed: use tls_server_fixture::CA_CERT_DER; 
 use tlsn::{
     config::{CertificateDer, ProtocolConfig, RootCertStore},
     connection::ServerName,
@@ -407,12 +406,11 @@ fn generate_zk_proof(
     setup_srs_from_bytecode(bytecode, None, false)?;
 
     // Verification key
-    // Load pre-computed VK from file
-    const VK_BYTES: &[u8] = include_bytes!("../../circuits/target/vk");
-    let vk = VK_BYTES.to_vec();
+    let vk = get_ultra_honk_verification_key(bytecode, false)?;
 
     // Generate proof
-    let proof = prove_ultra_honk(bytecode, witness.clone(), vk.clone(), false)?;
+    let proof = prove_ultra_honk_keccak(bytecode, witness.clone(), vk.clone(), false, false)?;
+    
     tracing::info!("✅ ZK Proof generated successfully!");
     tracing::info!("   Proof size: {} bytes", proof.len());
     tracing::info!("   VK size: {} bytes", vk.len());

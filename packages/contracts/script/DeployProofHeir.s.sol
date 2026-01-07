@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import {Script, console} from "forge-std/Script.sol";
 import {ProofHeir} from "../src/ProofHeir.sol";
-import {MockVerifier} from "../src/MockVerifier.sol";
+import {HonkVerifier} from "../src/Verifier.sol";
 import {MockERC20} from "../src/MockERC20.sol";
 
 contract DeployProofHeir is Script {
@@ -16,7 +16,7 @@ contract DeployProofHeir is Script {
         address targetWallet = 0xC7617F5aC47db5b237bCc7Eb1B2C3E1Da0Bac3f8;
         
         // 1. Deploy Verifier (using Mock for now)
-        MockVerifier verifier = new MockVerifier();
+        HonkVerifier verifier = new HonkVerifier();
         console.log("MockVerifier deployed at:", address(verifier));
 
         // 2. Deploy ProofHeir

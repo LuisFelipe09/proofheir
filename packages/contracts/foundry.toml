@@ -4,6 +4,11 @@ out = "out"
 libs = ["lib"]
 cache_path = "cache"
 
+# Optimization settings for large contracts (e.g., HonkVerifier)
+optimizer = true
+optimizer_runs = 200
+# via_ir can cause stack too deep errors, trying without it first
+
 # Allow reading test fixtures
 fs_permissions = [{ access = "read", path = "test/fixtures" }]
 

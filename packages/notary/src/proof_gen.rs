@@ -1,7 +1,6 @@
 /// Proof generation module - wraps the prover+verifier flow for API usage
 use crate::prover::prover;
 use crate::types::serialize_public_inputs_for_solidity;
-use serde_json::Value;
 
 /// Result of proof generation
 pub struct ProofGenerationResult {

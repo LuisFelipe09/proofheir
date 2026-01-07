@@ -207,7 +207,76 @@ pub async fn verifier<T: AsyncWrite + AsyncRead + Send + Sync + Unpin + 'static>
         .collect();
     
     // Convert proof to Bytes
-    let proof_bytes = Bytes::from(proof.clone());
+    
+    // ------------------------------------------------------------------------
+    // HANDLING PROOF SIZE MISMATCH (noir-rs vs Solidity Verifier)
+    // ------------------------------------------------------------------------
+    
+    // We calculate the number of public input fields dynamically based on the 
+    // serialization logic defined in `types.rs`. This ensures that if the 
+    // circuit inputs change, this logic adapts automatically.
+    
+    // Temporarily serialize inputs using the commitment provided in the bundle
+    // (We certify that this matches the proof later)
+    let temp_public_inputs_hex = serialize_public_inputs_for_solidity(
+        msg.public_inputs.recipient,
+        msg.public_inputs.server_hash,
+        msg.public_inputs.id_commitment,
+        &msg.public_inputs.status_commitment,
+    )?;
+    
+    let public_inputs_field_count = temp_public_inputs_hex.len();
+    let public_inputs_size_bytes = public_inputs_field_count * 32;
+    
+    // Check if proof contains concatenated public inputs
+    let proof_size_elements = proof.len() / 32;
+    
+    // If the proof is significantly larger than the inputs, and matches the 
+    // pattern of "Inputs + Proof", we slice. 
+    // (We don't hardcode 508 here, but assume anything larger than inputs 
+    // by a reasonable margin (e.g. > 1KB) likely includes the proof)
+    
+    let final_proof = if proof.len() > public_inputs_size_bytes && proof.len() % 32 == 0 {
+         // Heuristic: If proof starts with public inputs? 
+         // Since we can't easily verify the "Proof" part without verification,
+         // we assume that if it's the "Concatenated" style, it will be:
+         // Size = PublicInputsSize + PureProofSize
+         
+         // For safety against regression where noir-rs might NOT concatenate, 
+         // we check if slicing would leave a "valid-looking" proof size.
+         // UltraHonk proofs are usually around ~16KB (500+ fields).
+         
+         if proof.len() > public_inputs_size_bytes + 10000 { 
+             tracing::info!("💡 Detected Concatenated Proof ({} elements).", proof_size_elements);
+             tracing::info!("   Public Inputs count: {} elements.", public_inputs_field_count);
+             tracing::info!("   Action: Slicing off first {} bytes.", public_inputs_size_bytes);
+             
+             proof[public_inputs_size_bytes..].to_vec()
+         } else {
+             proof.clone()
+         }
+    } else {
+        proof.clone()
+    };
+    
+    let proof_bytes = Bytes::from(final_proof.clone()); // Use final_proof for transaction
+
+    // Validate Status Commitment extraction from the ORIGINAL full proof or the FINAL proof?
+    // If we sliced it, the final_proof does NOT contain the public inputs anymore.
+    // So we can't extract them from `final_proof`.
+    // But we need to verify that the proof actually "binds" those inputs.
+    
+    // Wait, if `proof` (the original) has inputs concatenated, they are at the beginning.
+    // The PROOF ITSELF (the zk part) doesn't "contain" the inputs in plain text, 
+    // it contains cryptographic commitments to them.
+    
+    // The logic below (lines 137+) was trying to extract `status_commitment` from 
+    // the proof by assuming offsets.
+    // `start_offset = (20 + 32 + 32) * 32` -> This offset is into the PUBLIC INPUTS section.
+    // So we MUST use the `proof` (original concatenated variable) to extract this check, 
+    // NOT `final_proof`.
+    
+    // ... existing logic uses `proof` variable ...
     
     // Create contract instance pointing to the TESTATOR'S DELEGATED ACCOUNT
     // This is the key change: we call the function on the testator's account,
