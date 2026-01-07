@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useAccount, usePublicClient } from 'wagmi'
-import { useWallets } from '@privy-io/react-auth'
+import { usePrivy, useWallets } from '@privy-io/react-auth'
 import { encodeFunctionData, type Address, type Hex } from 'viem'
 import { CONTRACTS } from '../config/contracts'
 import { emailToSalt, isValidEmail } from '../lib/utils'
@@ -21,8 +21,12 @@ const PROOF_HEIR_ABI = [
 
 export function ClaimCard() {
     const { address: connectedAddress, isConnected } = useAccount()
+    const { user } = usePrivy()
     const { wallets } = useWallets()
     const publicClient = usePublicClient()
+
+    // Get email from Privy user (auto-filled from login)
+    const userEmail = user?.email?.address || ''
 
     const [testatorAddress, setTestatorAddress] = useState('')
 
@@ -30,8 +34,7 @@ export function ClaimCard() {
     const [tokenAddresses, setTokenAddresses] = useState<string[]>([])
     const [newToken, setNewToken] = useState('')
 
-    // Email replaces salt
-    const [heirEmail, setHeirEmail] = useState('')
+    // NUIP still needs manual input
     const [nuipInput, setNuipInput] = useState('')
 
     const [status, setStatus] = useState<'idle' | 'generating' | 'waiting' | 'executing' | 'success' | 'error'>('idle')
@@ -65,8 +68,8 @@ export function ClaimCard() {
                 return
             }
 
-            if (!heirEmail || !isValidEmail(heirEmail)) {
-                setErrorMsg('Please enter a valid email address')
+            if (!userEmail || !isValidEmail(userEmail)) {
+                setErrorMsg('Your account email is required. Please log in with email.')
                 setStatus('error')
                 return
             }
@@ -88,8 +91,8 @@ export function ClaimCard() {
 
             const recipient = connectedAddress as Address
 
-            // Convert email to salt
-            const salt = await emailToSalt(heirEmail)
+            // Convert email to salt (using the logged-in user's email)
+            const salt = await emailToSalt(userEmail)
 
             const proofRes = await fetch('/api/generate-proof', {
                 method: 'POST',
@@ -189,14 +192,15 @@ export function ClaimCard() {
                 </div>
             ) : (
                 <>
-                    {/* Info Banner */}
-                    <div className="mb-6 p-4 bg-indigo-500/10 border border-indigo-500/20 rounded-xl">
-                        <div className="flex items-start gap-3">
-                            <svg className="w-5 h-5 text-indigo-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    {/* Your Email Banner - Auto-detected */}
+                    <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                        <div className="flex items-center gap-3">
+                            <svg className="w-5 h-5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                             </svg>
-                            <div className="text-sm text-indigo-200">
-                                Enter the same email and NUIP that the testator used when setting up the inheritance plan.
+                            <div>
+                                <div className="text-sm text-emerald-200 font-medium">Claiming as: {userEmail}</div>
+                                <div className="text-xs text-slate-400">This email will be used to verify your identity</div>
                             </div>
                         </div>
                     </div>
@@ -250,20 +254,7 @@ export function ClaimCard() {
 
                         <div>
                             <label className="block text-sm font-medium text-slate-300 mb-2">
-                                Your Email (as registered by Testator)
-                            </label>
-                            <input
-                                type="email"
-                                value={heirEmail}
-                                onChange={(e) => setHeirEmail(e.target.value)}
-                                placeholder="heir@example.com"
-                                className="w-full p-3 bg-slate-700/50 border border-white/10 rounded-xl text-white placeholder-slate-500 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-slate-300 mb-2">
-                                NUIP (Testator's ID Number)
+                                Testator's NUIP (ID Number)
                             </label>
                             <input
                                 type="text"
@@ -272,6 +263,9 @@ export function ClaimCard() {
                                 placeholder="e.g. 12345678"
                                 className="w-full p-3 bg-slate-700/50 border border-white/10 rounded-xl text-white placeholder-slate-500 font-mono text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                             />
+                            <p className="text-xs text-slate-500 mt-1">
+                                The testator should have shared this with you.
+                            </p>
                         </div>
                     </div>
 
@@ -280,8 +274,8 @@ export function ClaimCard() {
                         onClick={handleClaim}
                         disabled={status !== 'idle' && status !== 'error'}
                         className={`w-full py-3.5 px-4 rounded-xl font-semibold text-white transition-all flex items-center justify-center gap-2 ${status !== 'idle' && status !== 'error'
-                                ? 'bg-indigo-500/50 cursor-wait'
-                                : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-lg shadow-indigo-500/25'
+                            ? 'bg-indigo-500/50 cursor-wait'
+                            : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-lg shadow-indigo-500/25'
                             }`}
                     >
                         {status === 'generating' && (
