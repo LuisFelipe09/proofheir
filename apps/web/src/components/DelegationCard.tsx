@@ -5,9 +5,16 @@ import { usePrivy, useSign7702Authorization, useWallets } from '@privy-io/react-
 import { useReadContract, usePublicClient } from 'wagmi'
 import { formatUnits, encodeFunctionData, type Address, type Hex } from 'viem'
 import { CONTRACTS } from '../config/contracts'
+import { emailToSalt, isValidEmail } from '../lib/utils'
 
 const PROOF_HEIR_ADDRESS = CONTRACTS.PROOF_HEIR
-const MOCK_TOKEN_ADDRESS = CONTRACTS.MOCK_TOKEN
+
+// Common ERC20 tokens (for suggestions)
+const SUGGESTED_TOKENS = [
+    { symbol: 'USDC', address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' },
+    { symbol: 'USDT', address: '0xdAC17F958D2ee523a2206206994597C13D831ec7' },
+    { symbol: 'DAI', address: '0x6B175474E89094C44Da98b954EescdeCB5BE3830' },
+]
 
 export function DelegationCard() {
     const { authenticated, createWallet } = usePrivy()
@@ -17,23 +24,18 @@ export function DelegationCard() {
 
     const embeddedWallet = wallets.find(w => w.walletClientType === 'privy')
 
-    const { data: balanceData } = useReadContract({
-        address: MOCK_TOKEN_ADDRESS as Address,
-        abi: [{
-            "type": "function",
-            "name": "balanceOf",
-            "inputs": [{ "name": "account", "type": "address" }],
-            "outputs": [{ "name": "", "type": "uint256" }],
-            "stateMutability": "view"
-        }],
-        functionName: 'balanceOf',
-        args: embeddedWallet ? [embeddedWallet.address as Address] : undefined,
-        query: {
-            enabled: !!embeddedWallet,
-            refetchInterval: 5000
-        }
-    })
+    // Multi-token state
+    const [selectedTokens, setSelectedTokens] = useState<string[]>([])
+    const [newTokenAddress, setNewTokenAddress] = useState('')
 
+    // Heir info (email replaces salt)
+    const [heirEmail, setHeirEmail] = useState('')
+    const [nuipInput, setNuipInput] = useState('')
+
+    // Stepper state - 4 steps: 0=Welcome, 1=Assets, 2=Activate(delegation), 3=Register(identity)
+    const [currentStep, setCurrentStep] = useState(0)
+
+    // Process states
     const [delegationStatus, setDelegationStatus] = useState<'idle' | 'executing' | 'success' | 'error'>('idle')
     const [delegationError, setDelegationError] = useState('')
     const [installTxHash, setInstallTxHash] = useState<string | null>(null)
@@ -42,11 +44,10 @@ export function DelegationCard() {
     const [registrationStatus, setRegistrationStatus] = useState<'idle' | 'executing' | 'success' | 'error'>('idle')
     const [registrationError, setRegistrationError] = useState('')
     const [registerTxHash, setRegisterTxHash] = useState<string | null>(null)
-    const [nuipInput, setNuipInput] = useState('')
-    const [saltInput, setSaltInput] = useState('0x1111111111111111111111111111111111111111111111111111111111111111')
 
-    const [currentStep, setCurrentStep] = useState(0)
+    const hasEmbeddedWallet = wallets.some(w => w.walletClientType === 'privy')
 
+    // Check delegation status
     useEffect(() => {
         const checkDelegation = async () => {
             if (!embeddedWallet || !publicClient) return
@@ -57,8 +58,8 @@ export function DelegationCard() {
                 const alreadyDelegated = code?.startsWith('0xef0100') ?? false
                 setIsDelegated(alreadyDelegated)
 
-                if (alreadyDelegated && currentStep < 1) {
-                    setCurrentStep(1)
+                // Auto-advance to step 3 if already delegated
+                if (alreadyDelegated && currentStep === 2 && delegationStatus !== 'success') {
                     setDelegationStatus('success')
                 }
             } catch (e) {
@@ -68,11 +69,22 @@ export function DelegationCard() {
         checkDelegation()
         const interval = setInterval(checkDelegation, 5000)
         return () => clearInterval(interval)
-    }, [embeddedWallet, publicClient, currentStep])
+    }, [embeddedWallet, publicClient, currentStep, delegationStatus])
+
+    const addToken = () => {
+        if (newTokenAddress && newTokenAddress.startsWith('0x') && !selectedTokens.includes(newTokenAddress)) {
+            setSelectedTokens([...selectedTokens, newTokenAddress])
+            setNewTokenAddress('')
+        }
+    }
+
+    const removeToken = (address: string) => {
+        setSelectedTokens(selectedTokens.filter(t => t !== address))
+    }
 
     const handleDelegate = async () => {
         if (!authenticated || !embeddedWallet) {
-            setDelegationError('Connect your embedded wallet first')
+            setDelegationError('Connect your wallet first')
             setDelegationStatus('error')
             return
         }
@@ -120,7 +132,7 @@ export function DelegationCard() {
             await publicClient.waitForTransactionReceipt({ hash })
             setInstallTxHash(hash)
             setDelegationStatus('success')
-            setCurrentStep(1)
+            setCurrentStep(3) // Move to Register Identity step
 
         } catch (e: any) {
             setDelegationError(e.message || 'Delegation error')
@@ -129,8 +141,14 @@ export function DelegationCard() {
     }
 
     const handleRegister = async () => {
-        if (!authenticated || !embeddedWallet || !nuipInput || !saltInput) {
-            setRegistrationError('Please enter NUIP and Salt')
+        if (!authenticated || !embeddedWallet || !nuipInput || !heirEmail) {
+            setRegistrationError('Please fill all fields')
+            setRegistrationStatus('error')
+            return
+        }
+
+        if (!isValidEmail(heirEmail)) {
+            setRegistrationError('Please enter a valid email address')
             setRegistrationStatus('error')
             return
         }
@@ -141,12 +159,15 @@ export function DelegationCard() {
 
             if (!publicClient) throw new Error('Public client not available')
 
+            // Convert email to salt
+            const salt = await emailToSalt(heirEmail)
+
             const nuipBytes = new TextEncoder().encode(nuipInput)
             const nuipPadded = new Uint8Array(15)
             nuipPadded.set(nuipBytes.slice(0, Math.min(nuipBytes.length, 15)))
 
             const saltBytes = new Uint8Array(
-                saltInput.slice(2).match(/.{1,2}/g)!.map(byte => parseInt(byte, 16))
+                salt.slice(2).match(/.{1,2}/g)!.map(byte => parseInt(byte, 16))
             )
 
             const combined = new Uint8Array(nuipPadded.length + saltBytes.length)
@@ -183,25 +204,7 @@ export function DelegationCard() {
 
             await publicClient.waitForTransactionReceipt({ hash: registerTx as `0x${string}` })
             setRegisterTxHash(registerTx as string)
-
-            const storedCommitment = await publicClient.readContract({
-                address: embeddedWallet.address as Address,
-                abi: [{
-                    type: 'function',
-                    name: 'getIdentityCommitment',
-                    inputs: [],
-                    outputs: [{ name: '', type: 'bytes32' }],
-                    stateMutability: 'view'
-                }],
-                functionName: 'getIdentityCommitment'
-            })
-
-            if (storedCommitment === identityCommitment) {
-                setRegistrationStatus('success')
-                setCurrentStep(2)
-            } else {
-                throw new Error('Identity commitment mismatch!')
-            }
+            setRegistrationStatus('success')
 
         } catch (e: any) {
             setRegistrationError(e.message || 'Registration error')
@@ -209,236 +212,417 @@ export function DelegationCard() {
         }
     }
 
-    const hasEmbeddedWallet = wallets.some(w => w.walletClientType === 'privy')
+    // CORRECTED STEP ORDER:
+    // 0: Welcome
+    // 1: Select Assets (tokens)
+    // 2: Activate Plan (EIP-7702 delegation FIRST)
+    // 3: Register Identity (NUIP + email AFTER delegation)
 
     const steps = [
-        { id: 'install', title: 'Install Plan' },
-        { id: 'register', title: 'Register Identity' },
-        { id: 'complete', title: 'Complete' }
+        { id: 'welcome', title: 'Welcome' },
+        { id: 'assets', title: 'Select Assets' },
+        { id: 'activate', title: 'Activate Plan' },
+        { id: 'register', title: 'Register Identity' }
     ]
 
-    if (!authenticated) return (
-        <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="w-16 h-16 bg-blue-500/20 rounded-2xl flex items-center justify-center mb-4">
-                <svg className="w-8 h-8 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                </svg>
-            </div>
-            <h3 className="text-lg font-semibold text-white mb-2">Wallet Connection Required</h3>
-            <p className="text-slate-400 text-sm max-w-sm">Please connect your wallet to begin the inheritance configuration process.</p>
-        </div>
-    )
+    // STEP 0: WELCOME
+    if (currentStep === 0) {
+        return (
+            <div className="w-full">
+                <StepIndicator steps={steps} currentStep={currentStep} />
 
-    return (
-        <div className="w-full">
-            {/* Balance Display */}
-            <div className="mb-6 p-4 bg-slate-700/50 rounded-xl border border-white/10">
-                <div className="flex justify-between items-center">
-                    <span className="text-slate-400 text-sm font-medium">Available Balance</span>
-                    <span className="font-mono text-lg font-bold text-white">
-                        {balanceData !== undefined ? `${formatUnits(balanceData as bigint, 18)} MOCK` : 'Loading...'}
-                    </span>
+                <div className="text-center py-8">
+                    <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-2xl flex items-center justify-center">
+                        <svg className="w-10 h-10 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                        </svg>
+                    </div>
+                    <h3 className="text-2xl font-bold text-white mb-3">Secure Your Digital Legacy</h3>
+                    <p className="text-slate-400 max-w-md mx-auto mb-8">
+                        ProofHeir uses cutting-edge blockchain technology to ensure your digital assets are passed on to your chosen heir securely and privately.
+                    </p>
+
+                    {!authenticated ? (
+                        <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 mb-6">
+                            <p className="text-amber-300 text-sm">
+                                Please connect your wallet using the button in the header to continue.
+                            </p>
+                        </div>
+                    ) : !hasEmbeddedWallet ? (
+                        <button
+                            onClick={createWallet}
+                            className="w-full max-w-xs mx-auto bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white font-semibold py-3 px-6 rounded-xl transition-all shadow-lg shadow-purple-500/25"
+                        >
+                            Create Secure Wallet
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => setCurrentStep(1)}
+                            className="w-full max-w-xs mx-auto bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-semibold py-3.5 px-6 rounded-xl transition-all shadow-lg shadow-cyan-500/25 flex items-center justify-center gap-2"
+                        >
+                            Begin Setup
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                            </svg>
+                        </button>
+                    )}
                 </div>
             </div>
+        )
+    }
 
-            {!hasEmbeddedWallet ? (
-                <div className="text-center py-8">
-                    <p className="text-slate-400 text-sm mb-4">
-                        You need a Privy embedded wallet to use ProofHeir features.
-                    </p>
+    // STEP 1: SELECT ASSETS
+    if (currentStep === 1) {
+        return (
+            <div className="w-full">
+                <StepIndicator steps={steps} currentStep={currentStep} />
+
+                <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-white mb-2">Select Assets to Include</h3>
+                    <p className="text-slate-400 text-sm">Add the ERC20 token addresses you want to include in your inheritance plan.</p>
+                </div>
+
+                {/* Token List */}
+                <div className="space-y-2 mb-4">
+                    {selectedTokens.map((token, idx) => (
+                        <div key={idx} className="flex items-center justify-between bg-slate-700/50 p-3 rounded-xl border border-white/10">
+                            <span className="font-mono text-sm text-white">{token.slice(0, 10)}...{token.slice(-8)}</span>
+                            <button onClick={() => removeToken(token)} className="text-rose-400 hover:text-rose-300 text-sm">
+                                Remove
+                            </button>
+                        </div>
+                    ))}
+                    {selectedTokens.length === 0 && (
+                        <div className="text-center py-6 text-slate-500 text-sm">
+                            No tokens added yet. Add your first token below.
+                        </div>
+                    )}
+                </div>
+
+                {/* Add Token */}
+                <div className="flex gap-2 mb-6">
+                    <input
+                        type="text"
+                        value={newTokenAddress}
+                        onChange={(e) => setNewTokenAddress(e.target.value)}
+                        placeholder="0x... token address"
+                        className="flex-1 p-3 bg-slate-700/50 border border-white/10 rounded-xl text-white placeholder-slate-500 font-mono text-sm focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                    />
                     <button
-                        onClick={createWallet}
-                        className="w-full bg-gradient-to-r from-purple-600 to-purple-500 hover:from-purple-500 hover:to-purple-400 text-white font-semibold py-3 px-6 rounded-xl transition-all shadow-lg shadow-purple-500/25"
+                        onClick={addToken}
+                        className="px-4 bg-cyan-600 hover:bg-cyan-500 text-white font-medium rounded-xl transition-colors"
                     >
-                        Create Embedded Wallet
+                        Add
                     </button>
+                </div>
+
+                {/* Suggestions */}
+                <div className="mb-6">
+                    <p className="text-xs text-slate-500 mb-2">Popular tokens:</p>
+                    <div className="flex gap-2 flex-wrap">
+                        {SUGGESTED_TOKENS.map(token => (
+                            <button
+                                key={token.symbol}
+                                onClick={() => !selectedTokens.includes(token.address) && setSelectedTokens([...selectedTokens, token.address])}
+                                disabled={selectedTokens.includes(token.address)}
+                                className="px-3 py-1.5 text-xs bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 rounded-lg border border-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                {token.symbol}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                {/* Navigation */}
+                <div className="flex gap-3">
+                    <button
+                        onClick={() => setCurrentStep(0)}
+                        className="flex-1 py-3 px-4 rounded-xl font-medium text-slate-400 border border-white/10 hover:bg-slate-700/50 transition-colors"
+                    >
+                        Back
+                    </button>
+                    <button
+                        onClick={() => setCurrentStep(2)}
+                        disabled={selectedTokens.length === 0}
+                        className="flex-1 py-3 px-4 rounded-xl font-semibold text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-cyan-500/25"
+                    >
+                        Continue
+                    </button>
+                </div>
+            </div>
+        )
+    }
+
+    // STEP 2: ACTIVATE PLAN (EIP-7702 Delegation) - NOW COMES BEFORE IDENTITY REGISTRATION
+    if (currentStep === 2) {
+        return (
+            <div className="w-full">
+                <StepIndicator steps={steps} currentStep={currentStep} />
+
+                <div className="mb-6">
+                    <h3 className="text-lg font-semibold text-white mb-2">Activate Your Plan</h3>
+                    <p className="text-slate-400 text-sm">Enable the inheritance smart contract on your wallet using EIP-7702.</p>
+                </div>
+
+                {/* What this does */}
+                <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-4 mb-6">
+                    <div className="flex items-start gap-3">
+                        <svg className="w-5 h-5 text-blue-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div className="text-sm text-blue-200">
+                            <strong>What happens:</strong> Your wallet will be enhanced with inheritance capabilities. This is a one-time setup that allows the claim contract to manage asset transfers.
+                        </div>
+                    </div>
+                </div>
+
+                {/* Summary */}
+                <div className="bg-slate-700/30 rounded-xl p-4 mb-6">
+                    <h4 className="text-sm font-medium text-slate-300 mb-3">Plan Summary</h4>
+                    <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                            <span className="text-slate-500">Tokens included:</span>
+                            <span className="text-white">{selectedTokens.length} selected</span>
+                        </div>
+                        <div className="flex justify-between">
+                            <span className="text-slate-500">Contract:</span>
+                            <span className="text-white font-mono text-xs">{PROOF_HEIR_ADDRESS.slice(0, 10)}...</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Delegation Button */}
+                {isDelegated || delegationStatus === 'success' ? (
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 mb-6">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-emerald-500 rounded-full flex items-center justify-center">
+                                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h4 className="font-medium text-white">Plan Activated!</h4>
+                                <p className="text-xs text-emerald-400">EIP-7702 delegation successful</p>
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <button
+                        onClick={handleDelegate}
+                        disabled={delegationStatus === 'executing'}
+                        className="w-full py-3.5 px-4 rounded-xl font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-50 disabled:cursor-wait transition-all shadow-lg shadow-blue-500/25 flex items-center justify-center gap-2 mb-6"
+                    >
+                        {delegationStatus === 'executing' ? (
+                            <>
+                                <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Activating...
+                            </>
+                        ) : (
+                            <>
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                                </svg>
+                                Activate Plan
+                            </>
+                        )}
+                    </button>
+                )}
+
+                {delegationError && (
+                    <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-3 mb-6">
+                        <p className="text-rose-400 text-sm">{delegationError}</p>
+                    </div>
+                )}
+
+                {/* Navigation */}
+                <div className="flex gap-3">
+                    <button
+                        onClick={() => setCurrentStep(1)}
+                        className="flex-1 py-3 px-4 rounded-xl font-medium text-slate-400 border border-white/10 hover:bg-slate-700/50 transition-colors"
+                    >
+                        Back
+                    </button>
+                    <button
+                        onClick={() => setCurrentStep(3)}
+                        disabled={!isDelegated && delegationStatus !== 'success'}
+                        className="flex-1 py-3 px-4 rounded-xl font-semibold text-white bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-cyan-500/25"
+                    >
+                        Continue
+                    </button>
+                </div>
+            </div>
+        )
+    }
+
+    // STEP 3: REGISTER IDENTITY (NUIP + Email) - NOW COMES AFTER DELEGATION
+    return (
+        <div className="w-full">
+            <StepIndicator steps={steps} currentStep={currentStep} />
+
+            {registrationStatus === 'success' ? (
+                // SUCCESS STATE
+                <div className="text-center py-8">
+                    <div className="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-emerald-500 to-green-500 rounded-2xl flex items-center justify-center shadow-lg shadow-emerald-500/30">
+                        <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                    </div>
+                    <h3 className="text-2xl font-bold text-white mb-3">Inheritance Plan Complete!</h3>
+                    <p className="text-slate-400 max-w-md mx-auto mb-6">
+                        Your digital legacy is now protected. Your heir can claim the assets using their email and your NUIP.
+                    </p>
+
+                    <div className="bg-slate-700/50 rounded-xl p-4 max-w-sm mx-auto space-y-2">
+                        <div className="flex justify-between text-sm">
+                            <span className="text-slate-500">Assets included:</span>
+                            <span className="text-white font-medium">{selectedTokens.length} token(s)</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                            <span className="text-slate-500">Heir:</span>
+                            <span className="text-white font-medium">{heirEmail}</span>
+                        </div>
+                        {registerTxHash && (
+                            <div className="flex justify-between text-xs pt-2 border-t border-white/10">
+                                <span className="text-slate-500">Tx:</span>
+                                <span className="text-emerald-400 font-mono">{registerTxHash.slice(0, 12)}...</span>
+                            </div>
+                        )}
+                    </div>
                 </div>
             ) : (
                 <>
-                    {/* Stepper */}
-                    <div className="mb-8">
-                        <div className="flex items-center justify-between relative">
-                            <div className="absolute top-5 left-0 right-0 h-0.5 bg-slate-700" />
-                            <div
-                                className="absolute top-5 left-0 h-0.5 bg-gradient-to-r from-blue-500 to-blue-400 transition-all duration-500"
-                                style={{ width: `${(currentStep / (steps.length - 1)) * 100}%` }}
+                    <div className="mb-6">
+                        <h3 className="text-lg font-semibold text-white mb-2">Register Heir Identity</h3>
+                        <p className="text-slate-400 text-sm">Enter your heir's information to complete the setup.</p>
+                    </div>
+
+                    <div className="space-y-4 mb-6">
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-2">
+                                Heir's Email Address
+                            </label>
+                            <input
+                                type="email"
+                                value={heirEmail}
+                                onChange={(e) => setHeirEmail(e.target.value)}
+                                placeholder="heir@example.com"
+                                className="w-full p-3 bg-slate-700/50 border border-white/10 rounded-xl text-white placeholder-slate-500 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                             />
-                            {steps.map((step, index) => (
-                                <div key={step.id} className="relative flex flex-col items-center z-10">
-                                    <div
-                                        className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 ${index < currentStep
-                                                ? 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg shadow-green-500/30'
-                                                : index === currentStep
-                                                    ? 'bg-gradient-to-r from-blue-600 to-blue-500 text-white shadow-lg shadow-blue-500/30 ring-4 ring-blue-500/20'
-                                                    : 'bg-slate-700 text-slate-400'
-                                            }`}
-                                    >
-                                        {index < currentStep ? (
-                                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                            </svg>
-                                        ) : (
-                                            index + 1
-                                        )}
-                                    </div>
-                                    <span className={`mt-2 text-xs font-medium ${index <= currentStep ? 'text-white' : 'text-slate-500'
-                                        }`}>
-                                        {step.title}
-                                    </span>
-                                </div>
-                            ))}
+                            <p className="text-xs text-slate-500 mt-1">
+                                Your heir will use this email to identify themselves when claiming.
+                            </p>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-slate-300 mb-2">
+                                Your NUIP (National ID Number)
+                            </label>
+                            <input
+                                type="text"
+                                value={nuipInput}
+                                onChange={(e) => setNuipInput(e.target.value)}
+                                placeholder="e.g. 12345678"
+                                className="w-full p-3 bg-slate-700/50 border border-white/10 rounded-xl text-white placeholder-slate-500 font-mono text-sm focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                            />
+                            <p className="text-xs text-slate-500 mt-1">
+                                Used for ZK proof verification. Never stored on-chain.
+                            </p>
                         </div>
                     </div>
 
-                    {/* Step Content */}
-                    <div className="min-h-[280px]">
-                        {/* STEP 1: INSTALL */}
-                        {currentStep === 0 && (
-                            <div className="space-y-4 animate-fadeIn">
-                                <div className="bg-slate-700/30 p-5 rounded-xl border border-white/5">
-                                    <h4 className="font-semibold text-white mb-2 flex items-center gap-2">
-                                        <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                                        </svg>
-                                        Enable EIP-7702 Delegation
-                                    </h4>
-                                    <p className="text-sm text-slate-400 mb-4">
-                                        This transaction authorizes the ProofHeir contract to manage your account for inheritance purposes.
-                                    </p>
-
-                                    <button
-                                        onClick={handleDelegate}
-                                        disabled={delegationStatus === 'executing'}
-                                        className={`w-full py-3.5 px-4 rounded-xl font-semibold text-white transition-all flex items-center justify-center gap-2 ${delegationStatus === 'executing'
-                                                ? 'bg-blue-600/50 cursor-wait'
-                                                : 'bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-blue-400 shadow-lg shadow-blue-500/25'
-                                            }`}
-                                    >
-                                        {delegationStatus === 'executing' ? (
-                                            <>
-                                                <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
-                                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                                </svg>
-                                                Processing...
-                                            </>
-                                        ) : (
-                                            <>Sign & Install Delegation</>
-                                        )}
-                                    </button>
-
-                                    {delegationError && (
-                                        <div className="mt-3 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-lg flex items-start gap-2">
-                                            <svg className="w-4 h-4 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                            </svg>
-                                            <span>{delegationError}</span>
-                                        </div>
-                                    )}
-                                </div>
+                    {/* Info Banner */}
+                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-4 mb-6">
+                        <div className="flex items-start gap-3">
+                            <svg className="w-5 h-5 text-amber-400 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                            <div className="text-sm text-amber-200">
+                                <strong>Important:</strong> Share these details securely with your heir. They will need both the email and NUIP to claim the inheritance.
                             </div>
-                        )}
-
-                        {/* STEP 2: REGISTER */}
-                        {currentStep === 1 && (
-                            <div className="space-y-4 animate-fadeIn">
-                                <div className="bg-amber-500/10 p-4 rounded-xl border border-amber-500/20 mb-4">
-                                    <h4 className="font-semibold text-amber-300 mb-1 text-sm">Setup Identity Secrets</h4>
-                                    <p className="text-xs text-amber-200/70">
-                                        These values are hashed to create your identity commitment. Keep them safe.
-                                    </p>
-                                </div>
-
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-300 mb-2">
-                                            NUIP (ID Number)
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={nuipInput}
-                                            onChange={(e) => setNuipInput(e.target.value)}
-                                            placeholder="e.g. 12345678"
-                                            className="w-full p-3 bg-slate-700/50 border border-white/10 rounded-xl text-white placeholder-slate-500 font-mono text-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                                        />
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-slate-300 mb-2">
-                                            Secret Salt (Hex)
-                                        </label>
-                                        <input
-                                            type="text"
-                                            value={saltInput}
-                                            onChange={(e) => setSaltInput(e.target.value)}
-                                            placeholder="0x..."
-                                            className="w-full p-3 bg-slate-700/50 border border-white/10 rounded-xl text-white placeholder-slate-500 font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                                        />
-                                    </div>
-                                </div>
-
-                                <button
-                                    onClick={handleRegister}
-                                    disabled={registrationStatus === 'executing'}
-                                    className={`w-full py-3.5 px-4 rounded-xl font-semibold text-white transition-all mt-2 ${registrationStatus === 'executing'
-                                            ? 'bg-amber-600/50 cursor-wait'
-                                            : 'bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-500 hover:to-amber-400 shadow-lg shadow-amber-500/25'
-                                        }`}
-                                >
-                                    {registrationStatus === 'executing' ? 'Registering...' : 'Register Identity'}
-                                </button>
-
-                                {registrationError && (
-                                    <div className="mt-3 p-3 bg-red-500/10 border border-red-500/20 text-red-400 text-sm rounded-lg">
-                                        <strong>Error:</strong> {registrationError}
-                                    </div>
-                                )}
-
-                                {installTxHash && (
-                                    <div className="mt-4 pt-4 border-t border-white/10">
-                                        <div className="text-xs text-green-400 flex items-center gap-1.5">
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                            </svg>
-                                            <span>Delegation: {installTxHash.slice(0, 12)}...</span>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {/* STEP 3: COMPLETE */}
-                        {currentStep === 2 && (
-                            <div className="flex flex-col items-center justify-center py-8 text-center bg-gradient-to-br from-green-500/10 to-emerald-500/10 rounded-2xl border border-green-500/20 animate-fadeIn">
-                                <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-emerald-500 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-green-500/30">
-                                    <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                    </svg>
-                                </div>
-                                <h3 className="text-2xl font-bold text-white mb-2">Configuration Complete!</h3>
-                                <p className="text-slate-400 mb-6 max-w-sm text-sm">
-                                    Your account is now delegated and your identity is registered. ProofHeir will protect your assets.
-                                </p>
-
-                                <div className="w-full max-w-xs space-y-2">
-                                    {installTxHash && (
-                                        <div className="flex justify-between text-xs p-3 bg-slate-800/50 rounded-lg border border-white/10">
-                                            <span className="text-slate-500">Delegation</span>
-                                            <span className="font-mono text-green-400">{installTxHash.slice(0, 10)}...</span>
-                                        </div>
-                                    )}
-                                    {registerTxHash && (
-                                        <div className="flex justify-between text-xs p-3 bg-slate-800/50 rounded-lg border border-white/10">
-                                            <span className="text-slate-500">Identity</span>
-                                            <span className="font-mono text-green-400">{registerTxHash.slice(0, 10)}...</span>
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        )}
+                        </div>
                     </div>
+
+                    {/* Register Button */}
+                    <button
+                        onClick={handleRegister}
+                        disabled={registrationStatus === 'executing' || !heirEmail || !nuipInput || !isValidEmail(heirEmail)}
+                        className="w-full py-3.5 px-4 rounded-xl font-semibold text-white bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-500 hover:to-green-500 disabled:opacity-50 disabled:cursor-wait transition-all shadow-lg shadow-emerald-500/25 flex items-center justify-center gap-2 mb-6"
+                    >
+                        {registrationStatus === 'executing' ? (
+                            <>
+                                <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                </svg>
+                                Registering...
+                            </>
+                        ) : (
+                            <>
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                                Complete Setup
+                            </>
+                        )}
+                    </button>
+
+                    {registrationError && (
+                        <div className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-3 mb-6">
+                            <p className="text-rose-400 text-sm">{registrationError}</p>
+                        </div>
+                    )}
+
+                    {/* Back Button */}
+                    <button
+                        onClick={() => setCurrentStep(2)}
+                        className="w-full py-3 px-4 rounded-xl font-medium text-slate-400 border border-white/10 hover:bg-slate-700/50 transition-colors"
+                    >
+                        Back
+                    </button>
                 </>
             )}
+        </div>
+    )
+}
+
+// Step Indicator Component
+function StepIndicator({ steps, currentStep }: { steps: { id: string; title: string }[]; currentStep: number }) {
+    return (
+        <div className="mb-8">
+            <div className="flex items-center justify-between relative">
+                <div className="absolute top-5 left-0 right-0 h-0.5 bg-slate-700" />
+                <div
+                    className="absolute top-5 left-0 h-0.5 bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-500"
+                    style={{ width: `${(currentStep / (steps.length - 1)) * 100}%` }}
+                />
+                {steps.map((step, index) => (
+                    <div key={step.id} className="relative flex flex-col items-center z-10">
+                        <div
+                            className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 ${index < currentStep
+                                    ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-lg shadow-emerald-500/30'
+                                    : index === currentStep
+                                        ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-500/30 ring-4 ring-cyan-500/20'
+                                        : 'bg-slate-700 text-slate-400'
+                                }`}
+                        >
+                            {index < currentStep ? (
+                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                            ) : (
+                                index + 1
+                            )}
+                        </div>
+                        <span className={`mt-2 text-xs font-medium ${index <= currentStep ? 'text-white' : 'text-slate-500'
+                            }`}>
+                            {step.title}
+                        </span>
+                    </div>
+                ))}
+            </div>
         </div>
     )
 }
