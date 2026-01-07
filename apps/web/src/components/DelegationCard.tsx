@@ -78,6 +78,12 @@ export function DelegationCard() {
         }
     }
 
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            addToken()
+        }
+    }
+
     const removeToken = (address: string) => {
         setSelectedTokens(selectedTokens.filter(t => t !== address))
     }
@@ -313,7 +319,11 @@ export function DelegationCard() {
                     {selectedTokens.map((token, idx) => (
                         <div key={idx} className="flex items-center justify-between bg-slate-700/50 p-3 rounded-xl border border-white/10">
                             <span className="font-mono text-sm text-white">{token.slice(0, 10)}...{token.slice(-8)}</span>
-                            <button onClick={() => removeToken(token)} className="text-rose-400 hover:text-rose-300 text-sm">
+                            <button
+                                onClick={() => removeToken(token)}
+                                className="text-rose-400 hover:text-rose-300 text-sm"
+                                aria-label={`Remove token ${token}`}
+                            >
                                 Remove
                             </button>
                         </div>
@@ -331,12 +341,14 @@ export function DelegationCard() {
                         type="text"
                         value={newTokenAddress}
                         onChange={(e) => setNewTokenAddress(e.target.value)}
+                        onKeyDown={handleKeyDown}
                         placeholder="0x... token address"
                         className="flex-1 p-3 bg-slate-700/50 border border-white/10 rounded-xl text-white placeholder-slate-500 font-mono text-sm focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                     />
                     <button
                         onClick={addToken}
                         className="px-4 bg-cyan-600 hover:bg-cyan-500 text-white font-medium rounded-xl transition-colors"
+                        aria-label="Add token"
                     >
                         Add
                     </button>

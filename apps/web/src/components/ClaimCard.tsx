@@ -98,6 +98,12 @@ export function ClaimCard() {
         }
     }
 
+    const handleKeyDown = (e: React.KeyboardEvent) => {
+        if (e.key === 'Enter') {
+            addToken()
+        }
+    }
+
     const removeToken = (addr: string) => {
         setTokenAddresses(tokenAddresses.filter(t => t !== addr))
     }
@@ -340,7 +346,11 @@ export function ClaimCard() {
                                 {tokenAddresses.map((token, idx) => (
                                     <div key={idx} className="flex items-center justify-between bg-slate-700/50 p-2 rounded-lg border border-white/10">
                                         <span className="font-mono text-xs text-white">{token.slice(0, 10)}...{token.slice(-6)}</span>
-                                        <button onClick={() => removeToken(token)} className="text-rose-400 hover:text-rose-300 text-xs">
+                                        <button
+                                            onClick={() => removeToken(token)}
+                                            className="text-rose-400 hover:text-rose-300 text-xs"
+                                            aria-label={`Remove token ${token}`}
+                                        >
                                             ✕
                                         </button>
                                     </div>
@@ -351,12 +361,14 @@ export function ClaimCard() {
                                     type="text"
                                     value={newToken}
                                     onChange={(e) => setNewToken(e.target.value)}
+                                    onKeyDown={handleKeyDown}
                                     placeholder="0x... token address"
                                     className="flex-1 p-2 bg-slate-700/50 border border-white/10 rounded-lg text-white placeholder-slate-500 font-mono text-xs focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                                 />
                                 <button
                                     onClick={addToken}
                                     className="px-3 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium rounded-lg transition-colors"
+                                    aria-label="Add token"
                                 >
                                     Add
                                 </button>
