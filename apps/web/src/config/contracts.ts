@@ -6,8 +6,5 @@ export const CONTRACTS = {
     PROOF_HEIR: '0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0' as const,
 
     // Mock ERC20 token for testing
-    MOCK_TOKEN: '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9' as const,
-
-    // Verifier contract (HonkVerifier - 624 field elements for noir-rs v1.0.0-beta.8)
-    VERIFIER: '0x0DCd1Bf9A1b36cE34237eEaFef220932846BCD82' as const,
+    MOCK_TOKEN: '0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9' as const
 } as const
