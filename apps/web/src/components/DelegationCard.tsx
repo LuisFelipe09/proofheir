@@ -2,19 +2,13 @@
 
 import { useState, useEffect } from 'react'
 import { usePrivy, useSign7702Authorization, useWallets } from '@privy-io/react-auth'
-import { useReadContract, usePublicClient } from 'wagmi'
-import { formatUnits, encodeFunctionData, type Address, type Hex } from 'viem'
+import { usePublicClient } from 'wagmi'
+import { encodeFunctionData, type Address, type Hex } from 'viem'
 import { CONTRACTS } from '../config/contracts'
 import { emailToSalt, isValidEmail } from '../lib/utils'
+import { TokenSelector } from './TokenSelector'
 
 const PROOF_HEIR_ADDRESS = CONTRACTS.PROOF_HEIR
-
-// Common ERC20 tokens (for suggestions)
-const SUGGESTED_TOKENS = [
-    { symbol: 'USDC', address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48' },
-    { symbol: 'USDT', address: '0xdAC17F958D2ee523a2206206994597C13D831ec7' },
-    { symbol: 'DAI', address: '0x6B175474E89094C44Da98b954EescdeCB5BE3830' },
-]
 
 export function DelegationCard() {
     const { authenticated, createWallet } = usePrivy()
@@ -26,7 +20,6 @@ export function DelegationCard() {
 
     // Multi-token state
     const [selectedTokens, setSelectedTokens] = useState<string[]>([])
-    const [newTokenAddress, setNewTokenAddress] = useState('')
 
     // Heir info (email replaces salt)
     const [heirEmail, setHeirEmail] = useState('')
@@ -71,16 +64,7 @@ export function DelegationCard() {
         return () => clearInterval(interval)
     }, [embeddedWallet, publicClient, currentStep, delegationStatus])
 
-    const addToken = () => {
-        if (newTokenAddress && newTokenAddress.startsWith('0x') && !selectedTokens.includes(newTokenAddress)) {
-            setSelectedTokens([...selectedTokens, newTokenAddress])
-            setNewTokenAddress('')
-        }
-    }
-
-    const removeToken = (address: string) => {
-        setSelectedTokens(selectedTokens.filter(t => t !== address))
-    }
+    // Token selection is now handled by TokenSelector component
 
     const handleDelegate = async () => {
         if (!authenticated || !embeddedWallet) {
@@ -224,6 +208,23 @@ export function DelegationCard() {
 
             await publicClient.waitForTransactionReceipt({ hash: registerTx as `0x${string}` })
             setRegisterTxHash(registerTx as string)
+
+            // Save inheritance registry to Upstash (heir email -> testator wallet)
+            try {
+                await fetch('/api/inheritance', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        heirEmail: heirEmail,
+                        testatorWallet: embeddedWallet.address
+                    })
+                })
+                console.log('Inheritance registry saved for heir:', heirEmail)
+            } catch (registryError) {
+                console.warn('Failed to save inheritance registry:', registryError)
+                // Don't fail the whole flow if registry fails
+            }
+
             setRegistrationStatus('success')
 
         } catch (e: any) {
@@ -303,64 +304,16 @@ export function DelegationCard() {
             <div className="w-full">
                 <StepIndicator steps={steps} currentStep={currentStep} />
 
-                <div className="mb-6">
-                    <h3 className="text-lg font-semibold text-white mb-2">Select Assets to Include</h3>
-                    <p className="text-slate-400 text-sm">Add the ERC20 token addresses you want to include in your inheritance plan.</p>
-                </div>
-
-                {/* Token List */}
-                <div className="space-y-2 mb-4">
-                    {selectedTokens.map((token, idx) => (
-                        <div key={idx} className="flex items-center justify-between bg-slate-700/50 p-3 rounded-xl border border-white/10">
-                            <span className="font-mono text-sm text-white">{token.slice(0, 10)}...{token.slice(-8)}</span>
-                            <button onClick={() => removeToken(token)} className="text-rose-400 hover:text-rose-300 text-sm">
-                                Remove
-                            </button>
-                        </div>
-                    ))}
-                    {selectedTokens.length === 0 && (
-                        <div className="text-center py-6 text-slate-500 text-sm">
-                            No tokens added yet. Add your first token below.
-                        </div>
-                    )}
-                </div>
-
-                {/* Add Token */}
-                <div className="flex gap-2 mb-6">
-                    <input
-                        type="text"
-                        value={newTokenAddress}
-                        onChange={(e) => setNewTokenAddress(e.target.value)}
-                        placeholder="0x... token address"
-                        className="flex-1 p-3 bg-slate-700/50 border border-white/10 rounded-xl text-white placeholder-slate-500 font-mono text-sm focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
-                    />
-                    <button
-                        onClick={addToken}
-                        className="px-4 bg-cyan-600 hover:bg-cyan-500 text-white font-medium rounded-xl transition-colors"
-                    >
-                        Add
-                    </button>
-                </div>
-
-                {/* Suggestions */}
-                <div className="mb-6">
-                    <p className="text-xs text-slate-500 mb-2">Popular tokens:</p>
-                    <div className="flex gap-2 flex-wrap">
-                        {SUGGESTED_TOKENS.map(token => (
-                            <button
-                                key={token.symbol}
-                                onClick={() => !selectedTokens.includes(token.address) && setSelectedTokens([...selectedTokens, token.address])}
-                                disabled={selectedTokens.includes(token.address)}
-                                className="px-3 py-1.5 text-xs bg-slate-700/50 hover:bg-slate-600/50 text-slate-300 rounded-lg border border-white/10 disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {token.symbol}
-                            </button>
-                        ))}
-                    </div>
-                </div>
+                {/* Token Selector Component */}
+                <TokenSelector
+                    selectedTokens={selectedTokens}
+                    onTokensChange={setSelectedTokens}
+                    userAddress={embeddedWallet?.address}
+                    mode="delegation"
+                />
 
                 {/* Navigation */}
-                <div className="flex gap-3">
+                <div className="flex gap-3 mt-6">
                     <button
                         onClick={() => setCurrentStep(0)}
                         className="flex-1 py-3 px-4 rounded-xl font-medium text-slate-400 border border-white/10 hover:bg-slate-700/50 transition-colors"
