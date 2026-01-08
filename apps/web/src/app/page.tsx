@@ -6,6 +6,7 @@ import { ClaimCard } from '../components/ClaimCard'
 import { DevFaucet } from '../components/DevFaucet'
 import { useState } from 'react'
 import { usePrivy } from '@privy-io/react-auth'
+import { activeChain } from '../config/wagmi'
 
 type UserRole = 'none' | 'testator' | 'heir'
 
@@ -28,6 +29,14 @@ export default function Page() {
             <div>
               <span className="font-bold text-xl tracking-tight">ProofHeir</span>
               <span className="ml-2 text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full">Beta</span>
+              <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${activeChain.id === 31337
+                  ? 'bg-amber-500/20 text-amber-300'
+                  : activeChain.id === 5003
+                    ? 'bg-purple-500/20 text-purple-300'
+                    : 'bg-emerald-500/20 text-emerald-300'
+                }`}>
+                {activeChain.name}
+              </span>
             </div>
           </div>
           <div className="flex items-center gap-3">
