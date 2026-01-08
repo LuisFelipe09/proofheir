@@ -49,6 +49,15 @@
         "dev": true,
         "port": 3000
       }
+    },
+    "start": {
+      "executor": "@nx/next:server",
+      "defaultConfiguration": "production",
+      "options": {
+        "buildTarget": "web:build:production",
+        "dev": false,
+        "port": 3000
+      }
     }
   }
 }
