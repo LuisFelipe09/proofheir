@@ -5,16 +5,25 @@
 # Context: Repository root (monorepo)
 
 # Stage 1: Build
-FROM rust:1.83-bookworm AS builder
+# Using Ubuntu 24.04 for GCC 14 / libstdc++ with newer symbols needed by Barretenberg
+FROM ubuntu:24.04 AS builder
 
-# Install build dependencies
+# Install Rust nightly (required for TLSNotary edition = "2024")
 RUN apt-get update && apt-get install -y \
+    curl \
+    build-essential \
     pkg-config \
     libssl-dev \
     cmake \
     clang \
     llvm \
+    g++ \
+    git \
     && rm -rf /var/lib/apt/lists/*
+
+# Install Rust nightly
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly
+ENV PATH="/root/.cargo/bin:${PATH}"
 
 WORKDIR /app
 
@@ -33,12 +42,12 @@ COPY apps/api ./apps/api
 RUN cargo build --release --package proofheir-api
 
 # Stage 2: Runtime (minimal image)
-FROM debian:bookworm-slim
+FROM ubuntu:24.04
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
     ca-certificates \
-    libssl3 \
+    libssl3t64 \
     curl \
     && rm -rf /var/lib/apt/lists/*
 

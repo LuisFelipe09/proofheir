@@ -2,7 +2,10 @@
   "name": "@proofheir/source",
   "version": "0.0.0",
   "license": "MIT",
-  "scripts": {},
+  "scripts": {
+    "build:web": "nx build web --configuration=production",
+    "dev:web": "nx dev web"
+  },
   "private": true,
   "devDependencies": {
     "@nx/devkit": "22.3.3",
