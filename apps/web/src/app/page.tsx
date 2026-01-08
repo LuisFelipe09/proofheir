@@ -21,26 +21,38 @@ export default function Page() {
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white font-sans">
       {/* Header */}
       <header className="w-full border-b border-white/10 backdrop-blur-sm bg-slate-900/50 sticky top-0 z-50">
-        <div className="max-w-5xl mx-auto px-6 py-4 flex justify-between items-center">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center gap-2">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => setSelectedRole('none')}>
             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25">
               <span className="text-white font-bold text-lg">P</span>
             </div>
             <div>
-              <span className="font-bold text-xl tracking-tight">ProofHeir</span>
-              <span className="ml-2 text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full">Beta</span>
-              <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${activeChain.id === 31337
-                  ? 'bg-amber-500/20 text-amber-300'
-                  : activeChain.id === 5003
-                    ? 'bg-purple-500/20 text-purple-300'
-                    : 'bg-emerald-500/20 text-emerald-300'
+              <span className="font-bold text-lg sm:text-xl tracking-tight">ProofHeir</span>
+              <span className="hidden sm:inline ml-2 text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full">Beta</span>
+              <span className={`hidden sm:inline ml-2 text-xs px-2 py-0.5 rounded-full ${activeChain.id === 31337
+                ? 'bg-amber-500/20 text-amber-300'
+                : activeChain.id === 5003
+                  ? 'bg-purple-500/20 text-purple-300'
+                  : 'bg-emerald-500/20 text-emerald-300'
                 }`}>
                 {activeChain.name}
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <DevFaucet />
+
+          {/* Navigation Links - Desktop only */}
+          {showLanding && (
+            <nav className="hidden md:flex items-center gap-6 text-sm text-slate-400">
+              <a href="#how-it-works" className="hover:text-white transition-colors">How It Works</a>
+              <a href="#features" className="hover:text-white transition-colors">Features</a>
+              <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
+            </nav>
+          )}
+
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="hidden sm:block">
+              <DevFaucet />
+            </div>
             <WalletConnect />
           </div>
         </div>
@@ -65,16 +77,38 @@ export default function Page() {
                   Digital Legacy
                 </span>
               </h1>
-              <p className="text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed mb-12">
+              <p className="text-xl text-slate-400 max-w-2xl mx-auto leading-relaxed mb-8">
                 Your crypto assets, protected for generations. Set up your inheritance plan with privacy-preserving technology.
               </p>
+
+              {/* EIP-7702 Value Proposition */}
+              <div className="max-w-2xl mx-auto mb-12">
+                <div className="bg-gradient-to-r from-blue-500/10 via-indigo-500/10 to-purple-500/10 border border-blue-500/20 rounded-2xl p-4 sm:p-6 backdrop-blur-sm">
+                  <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 text-center sm:text-left">
+                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center flex-shrink-0 shadow-lg shadow-blue-500/25">
+                      <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <p className="text-slate-200 leading-relaxed">
+                        <span className="font-semibold text-white">Your assets never leave your wallet while you're alive.</span>{' '}
+                        We use <span className="text-blue-400 font-medium">EIP-7702</span> to delegate transfer permissions from your EOA only at the moment of execution.
+                      </p>
+                      <p className="text-sm text-slate-400 mt-2">
+                        The most secure and least intrusive inheritance solution on the market.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
 
               {/* Role Selection Cards */}
               <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto mb-16">
                 {/* Leave Inheritance Card */}
                 <button
                   onClick={() => setSelectedRole('testator')}
-                  className="group p-8 bg-slate-800/50 hover:bg-slate-800/80 border border-white/10 hover:border-blue-500/50 rounded-2xl text-left transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/10"
+                  className="group p-6 sm:p-8 bg-slate-800/50 hover:bg-slate-800/80 border border-white/10 hover:border-blue-500/50 rounded-2xl text-left transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/10"
                 >
                   <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-blue-500/25">
                     <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -86,7 +120,7 @@ export default function Page() {
                     Protect your digital assets and designate an heir who can claim them securely.
                   </p>
                   <span className="inline-flex items-center gap-2 text-blue-400 text-sm font-medium group-hover:gap-3 transition-all">
-                    Get Started
+                    Create My Plan
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                     </svg>
@@ -96,7 +130,7 @@ export default function Page() {
                 {/* Claim Inheritance Card */}
                 <button
                   onClick={() => setSelectedRole('heir')}
-                  className="group p-8 bg-slate-800/50 hover:bg-slate-800/80 border border-white/10 hover:border-indigo-500/50 rounded-2xl text-left transition-all duration-300 hover:shadow-xl hover:shadow-indigo-500/10"
+                  className="group p-6 sm:p-8 bg-slate-800/50 hover:bg-slate-800/80 border border-white/10 hover:border-indigo-500/50 rounded-2xl text-left transition-all duration-300 hover:shadow-xl hover:shadow-indigo-500/10"
                 >
                   <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-indigo-500/25">
                     <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -105,10 +139,10 @@ export default function Page() {
                   </div>
                   <h3 className="text-xl font-bold text-white mb-2">Claim an Inheritance</h3>
                   <p className="text-slate-400 text-sm mb-4">
-                    Verify your identity and receive assets that were left for you.
+                    Receive the assets a loved one secured for your future.
                   </p>
                   <span className="inline-flex items-center gap-2 text-indigo-400 text-sm font-medium group-hover:gap-3 transition-all">
-                    Get Started
+                    Claim Now
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                     </svg>
@@ -117,7 +151,7 @@ export default function Page() {
               </div>
 
               {/* How It Works */}
-              <div className="max-w-4xl mx-auto">
+              <div id="how-it-works" className="max-w-4xl mx-auto">
                 <h2 className="text-2xl font-bold text-white mb-8 text-center">How It Works</h2>
                 <div className="grid md:grid-cols-3 gap-8">
                   <div className="text-center">
@@ -139,7 +173,7 @@ export default function Page() {
               </div>
 
               {/* Real-World Data Feature */}
-              <div className="max-w-3xl mx-auto mt-16">
+              <div id="features" className="max-w-3xl mx-auto mt-16">
                 <div className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border border-amber-500/20 rounded-2xl p-8 text-center">
                   <div className="w-14 h-14 bg-gradient-to-br from-amber-500 to-orange-500 rounded-xl flex items-center justify-center mx-auto mb-4">
                     <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -186,6 +220,168 @@ export default function Page() {
                     <span>TLSNotary Verified</span>
                   </div>
                 </div>
+              </div>
+
+              {/* Pricing Section */}
+              <div id="pricing" className="max-w-5xl mx-auto mt-20 px-4">
+                <h2 className="text-2xl font-bold text-white mb-4 text-center">Choose Your Plan</h2>
+                <p className="text-slate-400 text-center mb-10 max-w-xl mx-auto">
+                  One-time setup fee + success fee only when assets are claimed. No monthly subscriptions.
+                </p>
+
+                <div className="grid md:grid-cols-3 gap-6">
+                  {/* Basic Plan */}
+                  <div className="bg-slate-800/50 border border-white/10 rounded-2xl p-6">
+                    <h3 className="text-lg font-bold text-white mb-1">Basic</h3>
+                    <p className="text-xs text-slate-500 mb-4">DeFi Retail Users</p>
+
+                    <div className="text-2xl font-extrabold text-white mb-1">
+                      $199 <span className="text-sm text-slate-400 font-normal">USD</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mb-4">one-time setup</p>
+
+                    <div className="bg-slate-700/50 rounded-lg p-3 mb-4">
+                      <div className="text-sm text-slate-300">Success Fee</div>
+                      <div className="text-xl font-bold text-white">1.5%</div>
+                      <div className="text-xs text-slate-500">on execution</div>
+                    </div>
+
+                    <div className="border-t border-white/10 pt-4">
+                      <div className="text-sm text-slate-400 mb-3">Protected Assets</div>
+                      <div className="text-lg font-semibold text-white">Up to $50k USD</div>
+                    </div>
+
+                    <ul className="mt-4 space-y-2 text-sm text-slate-400">
+                      <li className="flex items-center gap-2">
+                        <svg className="w-4 h-4 text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        ZK proof verification
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <svg className="w-4 h-4 text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        ETH & ERC-20 support
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <svg className="w-4 h-4 text-emerald-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        1 heir designation
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* Pro Plan */}
+                  <div className="bg-gradient-to-br from-blue-600/20 to-indigo-600/20 border border-blue-500/30 rounded-2xl p-6 relative">
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-xs font-bold rounded-full shadow-lg">
+                      MOST POPULAR
+                    </div>
+                    <h3 className="text-lg font-bold text-white mb-1">Pro</h3>
+                    <p className="text-xs text-blue-300 mb-4">Mid-Tier Investors & RWA</p>
+
+                    <div className="text-2xl font-extrabold text-white mb-1">
+                      $499 <span className="text-sm text-slate-400 font-normal">USD</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mb-4">one-time setup</p>
+
+                    <div className="bg-blue-500/20 rounded-lg p-3 mb-4">
+                      <div className="text-sm text-blue-200">Success Fee</div>
+                      <div className="text-xl font-bold text-white">1.0%</div>
+                      <div className="text-xs text-blue-300">on execution</div>
+                    </div>
+
+                    <div className="border-t border-blue-500/30 pt-4">
+                      <div className="text-sm text-slate-400 mb-3">Protected Assets</div>
+                      <div className="text-lg font-semibold text-white">$50k - $500k USD</div>
+                    </div>
+
+                    <ul className="mt-4 space-y-2 text-sm text-slate-300">
+                      <li className="flex items-center gap-2">
+                        <svg className="w-4 h-4 text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Everything in Basic
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <svg className="w-4 h-4 text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Multi-token transfers
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <svg className="w-4 h-4 text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Up to 3 heirs
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <svg className="w-4 h-4 text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Priority support
+                      </li>
+                    </ul>
+                  </div>
+
+                  {/* Whale Plan */}
+                  <div className="bg-gradient-to-br from-amber-600/20 to-orange-600/20 border border-amber-500/30 rounded-2xl p-6 relative">
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-1 bg-gradient-to-r from-amber-500 to-orange-600 text-white text-xs font-bold rounded-full shadow-lg">
+                      BEST VALUE
+                    </div>
+                    <h3 className="text-lg font-bold text-white mb-1">Whale</h3>
+                    <p className="text-xs text-amber-300 mb-4">HNWIs & Whales</p>
+
+                    <div className="text-2xl font-extrabold text-white mb-1">
+                      $1,499 <span className="text-sm text-slate-400 font-normal">USD</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mb-4">one-time setup</p>
+
+                    <div className="bg-amber-500/20 rounded-lg p-3 mb-4">
+                      <div className="text-sm text-amber-200">Success Fee</div>
+                      <div className="text-xl font-bold text-white">0.75%</div>
+                      <div className="text-xs text-amber-300">on execution</div>
+                    </div>
+
+                    <div className="border-t border-amber-500/30 pt-4">
+                      <div className="text-sm text-slate-400 mb-3">Protected Assets</div>
+                      <div className="text-lg font-semibold text-white">$500k+ USD</div>
+                    </div>
+
+                    <ul className="mt-4 space-y-2 text-sm text-slate-300">
+                      <li className="flex items-center gap-2">
+                        <svg className="w-4 h-4 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Everything in Pro
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <svg className="w-4 h-4 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Unlimited heirs
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <svg className="w-4 h-4 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Dedicated support
+                      </li>
+                      <li className="flex items-center gap-2">
+                        <svg className="w-4 h-4 text-amber-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        Custom integrations
+                      </li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Comparison note */}
+                <p className="text-center text-sm text-slate-500 mt-8">
+                  💡 Traditional notary fees range from 3% to 5% of estate value. ProofHeir saves you up to 85% on inheritance costs.
+                </p>
               </div>
             </div>
           </div>
