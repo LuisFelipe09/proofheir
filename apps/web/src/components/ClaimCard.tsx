@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useId } from 'react'
 import { useAccount, usePublicClient } from 'wagmi'
 import { usePrivy, useWallets } from '@privy-io/react-auth'
 import { encodeFunctionData, type Address } from 'viem'
@@ -33,6 +33,10 @@ export function ClaimCard() {
     const { user } = usePrivy()
     const { wallets } = useWallets()
     const publicClient = usePublicClient()
+
+    // Accessibility IDs
+    const testatorInputId = useId()
+    const nuipInputId = useId()
 
     // Get email from Privy user (auto-filled from login)
     const userEmail = user?.email?.address || ''
@@ -276,7 +280,7 @@ export function ClaimCard() {
                     {/* Your Email Banner - Auto-detected */}
                     <div className="mb-6 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
                         <div className="flex items-center gap-3">
-                            <svg className="w-5 h-5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg aria-hidden="true" className="w-5 h-5 text-emerald-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                             </svg>
                             <div>
@@ -289,7 +293,7 @@ export function ClaimCard() {
                     {/* Form Fields */}
                     <div className="space-y-4 mb-6">
                         <div>
-                            <label className="block text-sm font-medium text-slate-300 mb-2">
+                            <label htmlFor={testatorInputId} className="block text-sm font-medium text-slate-300 mb-2">
                                 Testator's Wallet Address
                                 {foundInheritance && (
                                     <span className="ml-2 text-xs text-emerald-400 font-normal">
@@ -298,6 +302,7 @@ export function ClaimCard() {
                                 )}
                             </label>
                             <input
+                                id={testatorInputId}
                                 type="text"
                                 value={testatorAddress}
                                 onChange={(e) => {
@@ -310,7 +315,7 @@ export function ClaimCard() {
                             />
                             {foundInheritance && (
                                 <p className="text-xs text-emerald-400 mt-1 flex items-center gap-1">
-                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg aria-hidden="true" className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
                                     We found an inheritance registered for your email
@@ -321,7 +326,7 @@ export function ClaimCard() {
                                 <div className="mt-2">
                                     {checkingHeir ? (
                                         <p className="text-xs text-slate-400 flex items-center gap-2">
-                                            <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                                            <svg aria-hidden="true" className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
                                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
                                             </svg>
@@ -330,7 +335,7 @@ export function ClaimCard() {
                                     ) : isHeirRegistered ? (
                                         <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg">
                                             <p className="text-xs text-emerald-300 flex items-center gap-2">
-                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <svg aria-hidden="true" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                                 </svg>
                                                 You are already registered as heir! No ZK proof needed.
@@ -358,10 +363,11 @@ export function ClaimCard() {
                         {/* NUIP - Only show if heir not already registered */}
                         {!isHeirRegistered && (
                             <div>
-                                <label className="block text-sm font-medium text-slate-300 mb-2">
+                                <label htmlFor={nuipInputId} className="block text-sm font-medium text-slate-300 mb-2">
                                     Testator's NUIP (ID Number)
                                 </label>
                                 <input
+                                    id={nuipInputId}
                                     type="text"
                                     value={nuipInput}
                                     onChange={(e) => setNuipInput(e.target.value)}
@@ -386,7 +392,7 @@ export function ClaimCard() {
                     >
                         {status === 'generating' && (
                             <>
-                                <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <svg aria-hidden="true" className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                 </svg>
@@ -395,7 +401,7 @@ export function ClaimCard() {
                         )}
                         {status === 'waiting' && (
                             <>
-                                <svg className="w-5 h-5 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg aria-hidden="true" className="w-5 h-5 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 Verifying Identity...
@@ -403,7 +409,7 @@ export function ClaimCard() {
                         )}
                         {status === 'executing' && (
                             <>
-                                <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                <svg aria-hidden="true" className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                 </svg>
@@ -412,7 +418,7 @@ export function ClaimCard() {
                         )}
                         {(status === 'idle' || status === 'error') && (
                             <>
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg aria-hidden="true" className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                                 </svg>
                                 {isHeirRegistered ? 'Claim Inheritance' : 'Verify & Claim'}
@@ -424,7 +430,7 @@ export function ClaimCard() {
                     {status === 'error' && (
                         <div className="mt-4 p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl">
                             <div className="flex items-start gap-2">
-                                <svg className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg aria-hidden="true" className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
                                 <div className="text-sm text-rose-300">{errorMsg}</div>
