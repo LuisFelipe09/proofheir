@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { usePrivy } from '@privy-io/react-auth'
-import { usePublicClient, useWalletClient } from 'wagmi'
-import { parseEther, formatEther } from 'viem'
+import { usePrivy, useWallets } from '@privy-io/react-auth'
+import { useAccount, usePublicClient } from 'wagmi'
+import { parseEther, formatEther, encodeFunctionData } from 'viem'
 import { CONTRACTS } from '../config/contracts'
 
 // ABI for MockERC20 mint function
@@ -29,12 +29,12 @@ const MOCK_ERC20_ABI = [
 
 export function DevFaucet() {
     const { authenticated, user } = usePrivy()
+    const { wallets } = useWallets()
+    const { address: connectedAddress } = useAccount()
     const publicClient = usePublicClient()
-    const { data: walletClient } = useWalletClient()
 
-    // Get address from Privy (same as WalletConnect)
-    const wallet = user?.linkedAccounts.find((account) => account.type === 'wallet')
-    const address = wallet?.address as `0x${string}` | undefined
+    // Get address from connected account
+    const address = connectedAddress
 
     const [isOpen, setIsOpen] = useState(false)
     const [isRequestingEth, setIsRequestingEth] = useState(false)
@@ -126,9 +126,14 @@ export function DevFaucet() {
         }
     }
 
-    // Request Mock Tokens
+    // Request Mock Tokens via Privy
     const requestTokens = async () => {
-        if (!address || !walletClient) return
+        const embeddedWallet = wallets.find(w => w.walletClientType === 'privy') || wallets.find(w => w.address === address)
+
+        if (!address || !embeddedWallet) {
+            setMessage({ type: 'error', text: 'Wallet not connected' })
+            return
+        }
 
         setIsRequestingTokens(true)
         setMessage(null)
@@ -136,14 +141,24 @@ export function DevFaucet() {
         try {
             const mintAmount = parseEther('1000')
 
-            const hash = await walletClient.writeContract({
-                address: CONTRACTS.MOCK_TOKEN as `0x${string}`,
+            const data = encodeFunctionData({
                 abi: MOCK_ERC20_ABI,
                 functionName: 'mint',
                 args: [address, mintAmount],
             })
 
-            await publicClient?.waitForTransactionReceipt({ hash })
+            const provider = await embeddedWallet.getEthereumProvider()
+
+            const hash = await provider.request({
+                method: 'eth_sendTransaction',
+                params: [{
+                    from: embeddedWallet.address,
+                    to: CONTRACTS.MOCK_TOKEN,
+                    data
+                }]
+            }) as string
+
+            await publicClient?.waitForTransactionReceipt({ hash: hash as `0x${string}` })
 
             setMessage({ type: 'success', text: '+1,000 MOCK ✓' })
             await fetchBalances()
@@ -248,8 +263,8 @@ export function DevFaucet() {
                         {/* Message */}
                         {message && (
                             <div className={`mt-3 p-2 rounded-lg text-xs text-center ${message.type === 'success'
-                                    ? 'bg-emerald-500/20 text-emerald-300'
-                                    : 'bg-red-500/20 text-red-300'
+                                ? 'bg-emerald-500/20 text-emerald-300'
+                                : 'bg-red-500/20 text-red-300'
                                 }`}>
                                 {message.text}
                             </div>
