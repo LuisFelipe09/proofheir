@@ -1,0 +1,56 @@
+# ===========================================
+# ProofHeir Docker Ignore
+# ===========================================
+
+# Version control
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# Node.js
+node_modules
+.next
+.npm
+
+# Rust build artifacts (we rebuild in Docker)
+target
+
+# Environment files (secrets)
+.env
+.env.local
+.env.*.local
+
+# Documentation
+*.md
+!README.md
+docs
+
+# Test files
+*.test.ts
+*.spec.ts
+**/test
+**/__tests__
+
+# E2E tests
+apps/web-e2e
+
+# Nx cache
+.nx
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+error.log
+
+# Build artifacts we don't need
+packages/contracts/cache
+packages/contracts/out
+packages/contracts/broadcast

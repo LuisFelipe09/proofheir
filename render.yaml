@@ -1,0 +1,70 @@
+# ProofHeir Render Blueprint
+# This file configures deployment of both web and api services
+# Deploy: Connect your GitHub repo to Render and it will auto-detect this file
+
+services:
+  # ===========================================
+  # Rust API Service (ZK Proof Generation)
+  # ===========================================
+  - type: web
+    name: proofheir-api
+    runtime: docker
+    dockerfilePath: ./apps/api/Dockerfile
+    dockerContext: .
+    region: oregon
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      # CORS - will be set after web service is deployed
+      - key: ALLOWED_ORIGIN
+        sync: false
+      # Civil Registry Configuration
+      - key: CIVIL_REGISTRY_DOMAIN
+        value: web-production-05160.up.railway.app
+      - key: CIVIL_REGISTRY_URL
+        value: https://web-production-05160.up.railway.app/VigenciaCedula/consulta
+      # Blockchain (Mantle Sepolia)
+      - key: RPC_URL
+        value: https://rpc.sepolia.mantle.xyz
+      # Verifier wallet private key - set manually in Render dashboard
+      - key: VERIFIER_PRIVATE_KEY
+        sync: false
+      # Logging
+      - key: RUST_LOG
+        value: proofheir_api=info,tower_http=debug
+
+  # ===========================================
+  # Next.js Web App
+  # ===========================================
+  - type: web
+    name: proofheir-web
+    runtime: node
+    buildCommand: cd apps/web && npm install && npm run build
+    startCommand: cd apps/web && npm start
+    region: oregon
+    plan: free
+    envVars:
+      # Privy Authentication
+      - key: NEXT_PUBLIC_PRIVY_APP_ID
+        sync: false
+      # Blockchain (Mantle Sepolia)
+      - key: NEXT_PUBLIC_CHAIN_ID
+        value: "5003"
+      - key: NEXT_PUBLIC_RPC_URL
+        value: https://rpc.sepolia.mantle.xyz
+      # Contract addresses - set after deployment
+      - key: NEXT_PUBLIC_PROOF_HEIR_ADDRESS
+        sync: false
+      - key: NEXT_PUBLIC_MOCK_TOKEN_ADDRESS
+        sync: false
+      # Rust API URL - will be proofheir-api.onrender.com
+      - key: RUST_API_URL
+        sync: false
+      # Upstash Redis
+      - key: UPSTASH_REDIS_REST_URL
+        sync: false
+      - key: UPSTASH_REDIS_REST_TOKEN
+        sync: false
+      # Sponsor wallet for EIP-7702 delegations
+      - key: SPONSOR_PRIVATE_KEY
+        sync: false

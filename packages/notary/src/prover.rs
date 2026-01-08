@@ -345,7 +345,7 @@ fn generate_zk_proof(
 ) -> Result<ZKProofBundle, Box<dyn std::error::Error>> {
     tracing::info!("🔒 Generating ZK proof with Noir...");
 
-    const PROGRAM_JSON: &str = include_str!("../../circuits/target/circuits.json");
+    const PROGRAM_JSON: &str = include_str!("../circuits.json");
 
     // 1. Load bytecode from program.json
     let json: Value = serde_json::from_str(PROGRAM_JSON)?;

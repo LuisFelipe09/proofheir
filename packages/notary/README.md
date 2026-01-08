@@ -130,10 +130,27 @@ packages/notary/
 │   ├── verifier.rs      # MPC-TLS verifier
 │   ├── proof_gen.rs     # High-level API wrapper
 │   └── types.rs         # Shared types (ZKProofBundle, PublicInputs)
-├── circuits/            # Noir ZK circuit
+├── circuits.json        # Compiled Noir circuit (from packages/circuits)
 ├── examples/            # Usage examples
 └── Cargo.toml
 ```
+
+### `circuits.json`
+
+This file contains the compiled Noir circuit bytecode and is **required** for proof generation. It is embedded into the binary at compile time via `include_str!`.
+
+**To regenerate after circuit changes:**
+```bash
+# 1. Compile the circuit
+cd packages/circuits
+nargo compile
+
+# 2. Copy to notary package
+cp target/circuits.json ../notary/circuits.json
+```
+
+> [!IMPORTANT]
+> After any changes to `packages/circuits/src/main.nr`, you must recompile the circuit and copy the updated `circuits.json` to this package.
 
 ## 🔧 Key Components
 

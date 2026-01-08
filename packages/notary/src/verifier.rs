@@ -107,7 +107,7 @@ pub async fn verifier<T: AsyncWrite + AsyncRead + Send + Sync + Unpin + 'static>
 
     // Verify ZK proof
     // Load bytecode from pre-computed path or include string if prefered
-    const PROGRAM_JSON: &str = include_str!("../../circuits/target/circuits.json");
+    const PROGRAM_JSON: &str = include_str!("../circuits.json");
     let json: Value = serde_json::from_str(PROGRAM_JSON)?;
     let bytecode = json["bytecode"]
         .as_str()
