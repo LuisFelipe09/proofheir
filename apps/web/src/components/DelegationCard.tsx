@@ -5,6 +5,7 @@ import { usePrivy, useSign7702Authorization, useWallets } from '@privy-io/react-
 import { usePublicClient } from 'wagmi'
 import { encodeFunctionData, type Address, type Hex } from 'viem'
 import { CONTRACTS } from '../config/contracts'
+import { activeChain } from '../config/wagmi'
 import { emailToSalt, isValidEmail } from '../lib/utils'
 import { TokenSelector } from './TokenSelector'
 
@@ -85,7 +86,7 @@ export function DelegationCard() {
 
             const rawAuth = await (signAuthorization as any)({
                 contractAddress: PROOF_HEIR_ADDRESS as Address,
-                chainId: 31337,
+                chainId: activeChain.id,
                 nonce: anvilNonce
             })
 
