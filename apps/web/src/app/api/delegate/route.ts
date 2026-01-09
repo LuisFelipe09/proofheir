@@ -1,25 +1,31 @@
 import { NextResponse } from 'next/server'
 import { createWalletClient, http, type Address, type Hex } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
-import { anvil } from 'viem/chains'
+import { mantleSepoliaTestnet } from 'viem/chains'
 
-const sponsorKey = process.env.SPONSOR_PRIVATE_KEY as Hex
 const rpcUrl = process.env.NEXT_PUBLIC_RPC_URL || 'http://127.0.0.1:8545'
 
-if (!sponsorKey) {
-    throw new Error('Missing SPONSOR_PRIVATE_KEY')
+// Helper to get sponsor client - created lazily to avoid build-time errors
+function getSponsorClient() {
+    const sponsorKey = process.env.SPONSOR_PRIVATE_KEY as Hex
+
+    if (!sponsorKey) {
+        throw new Error('Missing SPONSOR_PRIVATE_KEY environment variable')
+    }
+
+    const sponsorAccount = privateKeyToAccount(sponsorKey)
+
+    return createWalletClient({
+        account: sponsorAccount,
+        chain: mantleSepoliaTestnet,
+        transport: http(rpcUrl)
+    })
 }
-
-const sponsorAccount = privateKeyToAccount(sponsorKey)
-
-const sponsorClient = createWalletClient({
-    account: sponsorAccount,
-    chain: anvil,
-    transport: http(rpcUrl)
-})
 
 export async function POST(request: Request) {
     try {
+        const sponsorClient = getSponsorClient()
+
         const body = await request.json()
         const { authorization, targetAddress } = body
 
@@ -43,3 +49,4 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
     }
 }
+
