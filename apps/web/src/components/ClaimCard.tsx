@@ -56,6 +56,56 @@ export function ClaimCard() {
     const [errorMsg, setErrorMsg] = useState('')
     const [txHash, setTxHash] = useState<string | null>(null)
 
+    // Life status check
+    const [lifeStatus, setLifeStatus] = useState<'unknown' | 'alive' | 'deceased' | 'checking' | 'error'>('unknown')
+    const [togglingStatus, setTogglingStatus] = useState(false)
+
+    // Check life status when NUIP field loses focus
+    const checkLifeStatus = async (nuip: string) => {
+        if (!nuip || nuip.trim() === '') {
+            setLifeStatus('unknown')
+            return
+        }
+
+        setLifeStatus('checking')
+        try {
+            const response = await fetch(`/api/check-status?nuip=${encodeURIComponent(nuip)}`)
+            const data = await response.json()
+
+            if (data.found) {
+                setLifeStatus(data.isAlive ? 'alive' : 'deceased')
+            } else {
+                setLifeStatus('error')
+            }
+        } catch (e) {
+            console.warn('Life status check failed:', e)
+            setLifeStatus('error')
+        }
+    }
+
+    // Toggle status for MVP testing
+    const handleToggleStatus = async () => {
+        if (!nuipInput || togglingStatus) return
+
+        setTogglingStatus(true)
+        try {
+            const response = await fetch('/api/toggle-status', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ nuip: nuipInput })
+            })
+            const data = await response.json()
+
+            if (data.success) {
+                setLifeStatus(data.isAlive ? 'alive' : 'deceased')
+            }
+        } catch (e) {
+            console.warn('Toggle status failed:', e)
+        } finally {
+            setTogglingStatus(false)
+        }
+    }
+
     // Auto-lookup inheritance registry when user is logged in
     useEffect(() => {
         const lookupInheritance = async () => {
@@ -364,13 +414,94 @@ export function ClaimCard() {
                                 <input
                                     type="text"
                                     value={nuipInput}
-                                    onChange={(e) => setNuipInput(e.target.value)}
+                                    onChange={(e) => {
+                                        setNuipInput(e.target.value)
+                                        setLifeStatus('unknown') // Reset on change
+                                    }}
+                                    onBlur={() => checkLifeStatus(nuipInput)}
                                     placeholder="e.g. 12345678"
                                     className="w-full p-3 bg-slate-700/50 border border-white/10 rounded-xl text-white placeholder-slate-500 font-mono text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                                 />
                                 <p className="text-xs text-slate-500 mt-1">
                                     The testator should have shared this with you.
                                 </p>
+
+                                {/* Life Status Indicator */}
+                                {lifeStatus === 'checking' && (
+                                    <div className="mt-3 p-3 bg-slate-700/30 border border-slate-600/30 rounded-lg">
+                                        <div className="flex items-center gap-2 text-sm text-slate-400">
+                                            <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                            </svg>
+                                            Checking civil registry...
+                                        </div>
+                                    </div>
+                                )}
+
+                                {lifeStatus === 'alive' && (
+                                    <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
+                                        <div className="flex items-center gap-2 text-sm text-amber-300 mb-2">
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                            </svg>
+                                            <span className="font-medium">This person is registered as ALIVE</span>
+                                        </div>
+                                        <p className="text-xs text-amber-200/70 mb-3">
+                                            Inheritance cannot be claimed for a living person.
+                                        </p>
+                                        <button
+                                            onClick={handleToggleStatus}
+                                            disabled={togglingStatus}
+                                            className="w-full py-2 px-3 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/30 rounded-lg text-xs text-amber-200 transition-all flex items-center justify-center gap-2"
+                                        >
+                                            {togglingStatus ? (
+                                                <>
+                                                    <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                                    </svg>
+                                                    Updating...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                                    </svg>
+                                                    Change to Deceased (MVP Only)
+                                                </>
+                                            )}
+                                        </button>
+                                        <p className="text-[10px] text-slate-500 mt-2 text-center">
+                                            ⚠️ This option is for testing purposes only
+                                        </p>
+                                    </div>
+                                )}
+
+                                {lifeStatus === 'deceased' && (
+                                    <div className="mt-3 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
+                                        <div className="flex items-center gap-2 text-sm text-emerald-300">
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                            </svg>
+                                            <span className="font-medium">Registry confirmed: Deceased</span>
+                                        </div>
+                                        <p className="text-xs text-emerald-200/70 mt-1">
+                                            You may proceed with the inheritance claim.
+                                        </p>
+                                    </div>
+                                )}
+
+                                {lifeStatus === 'error' && (
+                                    <div className="mt-3 p-3 bg-slate-700/30 border border-slate-600/30 rounded-lg">
+                                        <div className="flex items-center gap-2 text-sm text-slate-400">
+                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            Could not verify in registry
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>
