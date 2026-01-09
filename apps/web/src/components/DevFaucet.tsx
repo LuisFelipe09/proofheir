@@ -5,6 +5,7 @@ import { usePrivy, useWallets } from '@privy-io/react-auth'
 import { useAccount, usePublicClient } from 'wagmi'
 import { parseEther, formatEther, encodeFunctionData } from 'viem'
 import { CONTRACTS } from '../config/contracts'
+import { activeChain } from '../config/wagmi'
 
 // ABI for MockERC20 mint function
 const MOCK_ERC20_ABI = [
@@ -38,11 +39,16 @@ export function DevFaucet() {
 
     const [isOpen, setIsOpen] = useState(false)
     const [isRequestingEth, setIsRequestingEth] = useState(false)
+    const [isRequestingMnt, setIsRequestingMnt] = useState(false)
     const [isRequestingTokens, setIsRequestingTokens] = useState(false)
     const [ethBalance, setEthBalance] = useState<string>('0')
     const [tokenBalance, setTokenBalance] = useState<string>('0')
     const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
     const popupRef = useRef<HTMLDivElement>(null)
+
+    // Detect if we're on a Mantle network
+    const isMantle = activeChain.id === 5003 || activeChain.id === 5000
+    const nativeSymbol = isMantle ? 'MNT' : 'ETH'
 
     // Close popup when clicking outside
     useEffect(() => {
@@ -88,7 +94,7 @@ export function DevFaucet() {
         }
     }, [isOpen, address])
 
-    // Request ETH from Anvil faucet
+    // Request ETH from Anvil faucet (only for local dev)
     const requestEth = async () => {
         if (!address) return
 
@@ -123,6 +129,40 @@ export function DevFaucet() {
             setMessage({ type: 'error', text: 'Failed - Is Anvil running?' })
         } finally {
             setIsRequestingEth(false)
+        }
+    }
+
+    // Request MNT from backend faucet (for Mantle networks)
+    const requestMnt = async () => {
+        if (!address) return
+
+        setIsRequestingMnt(true)
+        setMessage(null)
+
+        console.log('Requesting MNT for address:', address)
+
+        try {
+            const response = await fetch('/api/faucet', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ address }),
+            })
+
+            const result = await response.json()
+            console.log('Faucet response:', result)
+
+            if (!response.ok) {
+                throw new Error(result.error || 'Failed to request MNT')
+            }
+
+            setMessage({ type: 'success', text: '+1 MNT ✓' })
+            await fetchBalances()
+        } catch (error) {
+            console.error('Error requesting MNT:', error)
+            const errorMsg = error instanceof Error ? error.message : 'Failed to request MNT'
+            setMessage({ type: 'error', text: errorMsg })
+        } finally {
+            setIsRequestingMnt(false)
         }
     }
 
@@ -212,7 +252,7 @@ export function DevFaucet() {
                         {/* Balances */}
                         <div className="grid grid-cols-2 gap-2 mb-4">
                             <div className="bg-slate-700/50 rounded-lg p-2.5">
-                                <p className="text-[10px] text-slate-400 mb-0.5">ETH</p>
+                                <p className="text-[10px] text-slate-400 mb-0.5">{nativeSymbol}</p>
                                 <p className="text-sm font-bold text-white">{parseFloat(ethBalance).toFixed(3)}</p>
                             </div>
                             <div className="bg-slate-700/50 rounded-lg p-2.5">
@@ -224,11 +264,11 @@ export function DevFaucet() {
                         {/* Buttons */}
                         <div className="space-y-2">
                             <button
-                                onClick={requestEth}
-                                disabled={isRequestingEth}
+                                onClick={isMantle ? requestMnt : requestEth}
+                                disabled={isMantle ? isRequestingMnt : isRequestingEth}
                                 className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-600 text-white text-sm font-medium rounded-lg transition-all"
                             >
-                                {isRequestingEth ? (
+                                {(isMantle ? isRequestingMnt : isRequestingEth) ? (
                                     <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
                                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
@@ -238,7 +278,7 @@ export function DevFaucet() {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
                                 )}
-                                Get 100 ETH
+                                Get Gas
                             </button>
 
                             <button
@@ -272,11 +312,12 @@ export function DevFaucet() {
 
                         {/* Footer */}
                         <p className="mt-3 text-[10px] text-slate-500 text-center">
-                            Works with local Anvil (localhost:8545)
+                            Connected to {activeChain.name}
                         </p>
                     </div>
                 </div>
-            )}
-        </div>
+            )
+            }
+        </div >
     )
 }
