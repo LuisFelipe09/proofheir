@@ -37,6 +37,13 @@ export async function POST(request: Request) {
         const body = await request.json()
         const { authorization, targetAddress } = body
 
+        console.log('📋 Delegate request received:', {
+            targetAddress,
+            authAddress: authorization?.address,
+            authChainId: authorization?.chainId,
+            authNonce: authorization?.nonce,
+        })
+
         if (!authorization || !targetAddress) {
             return NextResponse.json({ error: 'Missing parameters' }, { status: 400 })
         }
@@ -48,32 +55,49 @@ export async function POST(request: Request) {
             authorizationList: [authorization],
         }
 
-        // Try to estimate gas, with fallback to high limit
+        // EIP-7702 has additional intrinsic gas costs that eth_estimateGas might not handle well
+        // Mantle requires ~145M gas for EIP-7702 delegation transactions
+        const MIN_GAS_FOR_7702 = 150_000_000n // 150M minimum for Mantle EIP-7702
+
         let gasLimit: bigint
         try {
             const gasEstimate = await publicClient.estimateGas({
                 account: sponsorClient.account,
                 ...txParams,
             })
-            // Add 50% buffer for safety
-            gasLimit = gasEstimate * 150n / 100n
-            console.log(`Gas estimated: ${gasEstimate}, using: ${gasLimit} (+50% buffer)`)
+            console.log(`✅ Gas estimated: ${gasEstimate}`)
+
+            // Add 100% buffer for EIP-7702 overhead that might not be fully captured
+            gasLimit = gasEstimate * 2n
+
+            // Ensure minimum gas for EIP-7702
+            if (gasLimit < MIN_GAS_FOR_7702) {
+                gasLimit = MIN_GAS_FOR_7702
+            }
+
+            console.log(`📊 Using gas: ${gasLimit} (2x estimate + min check)`)
         } catch (estimateError) {
-            // Fallback to high limit if estimation fails
-            console.warn('Gas estimation failed, using fallback:', estimateError)
-            gasLimit = 200_000_000n
+            // EIP-7702 estimation often fails - use fallback
+            console.warn('⚠️ Gas estimation failed (common for EIP-7702):', estimateError)
+            gasLimit = 200_000_000n // High fallback for Mantle + ZK verification
+            console.log(`📊 Using fallback gas: ${gasLimit}`)
         }
+
+        console.log('🔄 Sending EIP-7702 delegation transaction...')
 
         const hash = await sponsorClient.sendTransaction({
             ...txParams,
             gas: gasLimit,
         })
 
+        console.log(`✅ Transaction sent: ${hash}`)
+
         return NextResponse.json({ hash }, { status: 200 })
 
     } catch (error: unknown) {
-        console.error('API Error:', error)
+        console.error('❌ API Error:', error)
         const message = error instanceof Error ? error.message : 'Internal Server Error'
         return NextResponse.json({ error: message }, { status: 500 })
     }
 }
+
