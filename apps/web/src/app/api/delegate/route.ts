@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { createWalletClient, http, type Address, type Hex } from 'viem'
+import { createWalletClient, createPublicClient, http, type Address, type Hex } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
 import { mantleSepoliaTestnet } from 'viem/chains'
 
@@ -22,9 +22,17 @@ function getSponsorClient() {
     })
 }
 
+function getPublicClient() {
+    return createPublicClient({
+        chain: mantleSepoliaTestnet,
+        transport: http(rpcUrl)
+    })
+}
+
 export async function POST(request: Request) {
     try {
         const sponsorClient = getSponsorClient()
+        const publicClient = getPublicClient()
 
         const body = await request.json()
         const { authorization, targetAddress } = body
@@ -33,20 +41,39 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Missing parameters' }, { status: 400 })
         }
 
+        const txParams = {
+            to: targetAddress as Address,
+            value: 0n,
+            data: '0x' as Hex,
+            authorizationList: [authorization],
+        }
+
+        // Try to estimate gas, with fallback to high limit
+        let gasLimit: bigint
+        try {
+            const gasEstimate = await publicClient.estimateGas({
+                account: sponsorClient.account,
+                ...txParams,
+            })
+            // Add 50% buffer for safety
+            gasLimit = gasEstimate * 150n / 100n
+            console.log(`Gas estimated: ${gasEstimate}, using: ${gasLimit} (+50% buffer)`)
+        } catch (estimateError) {
+            // Fallback to high limit if estimation fails
+            console.warn('Gas estimation failed, using fallback:', estimateError)
+            gasLimit = 200_000_000n
+        }
 
         const hash = await sponsorClient.sendTransaction({
-            to: targetAddress as Address, // Send to the user's address (EIP-7702 target)
-            value: 0n,
-            data: '0x', // Empty data
-            authorizationList: [authorization], // The EIP-7702 authorization
-            kzg: undefined // Not needed for this simple case
+            ...txParams,
+            gas: gasLimit,
         })
 
         return NextResponse.json({ hash }, { status: 200 })
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('API Error:', error)
-        return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
+        const message = error instanceof Error ? error.message : 'Internal Server Error'
+        return NextResponse.json({ error: message }, { status: 500 })
     }
 }
-
