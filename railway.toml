@@ -1,0 +1,15 @@
+# Railway configuration for ProofHeir API
+# This file tells Railway to use Docker instead of Nixpacks
+
+[build]
+# Use Dockerfile build
+builder = "dockerfile"
+# Path to Dockerfile relative to root directory setting in Railway
+dockerfilePath = "apps/api/Dockerfile"
+# Watch paths for rebuilds
+watchPatterns = ["apps/api/**", "packages/notary/**", "Cargo.toml", "Cargo.lock"]
+
+[deploy]
+numReplicas = 1
+healthcheckPath = "/health"
+restartPolicyType = "ON_FAILURE"
