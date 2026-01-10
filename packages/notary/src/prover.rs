@@ -59,8 +59,10 @@ pub async fn prover<T: AsyncWrite + AsyncRead + Send + Unpin + 'static>(
     let server_domain = uri.authority().ok_or("URI must have authority")?.host();
 
     // Load native root certificates and convert to tlsn format
-    let roots: Vec<CertificateDer> = rustls_native_certs::load_native_certs()
-        .expect("could not load platform certs")
+    let native_certs = rustls_native_certs::load_native_certs()
+        .map_err(|e| format!("Failed to load platform certificates: {}", e))?;
+    
+    let roots: Vec<CertificateDer> = native_certs
         .into_iter()
         .map(|cert| CertificateDer(cert.0))
         .collect();

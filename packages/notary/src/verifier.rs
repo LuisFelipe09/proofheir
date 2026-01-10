@@ -47,8 +47,10 @@ pub async fn verifier<T: AsyncWrite + AsyncRead + Send + Sync + Unpin + 'static>
         .build()?;
 
     // Use native root certificates (matching Prover)
-    let roots: Vec<CertificateDer> = rustls_native_certs::load_native_certs()
-        .expect("could not load platform certs")
+    let native_certs = rustls_native_certs::load_native_certs()
+        .map_err(|e| format!("Failed to load platform certificates: {}", e))?;
+        
+    let roots: Vec<CertificateDer> = native_certs
         .into_iter()
         .map(|cert| CertificateDer(cert.0))
         .collect();

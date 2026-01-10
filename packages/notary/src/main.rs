@@ -17,6 +17,10 @@ struct Args {
     /// Salt for ID commitment (64 hex characters)
     #[arg(short, long, default_value = "1111111111111111111111111111111111111111111111111111111111111111")]
     salt: String,
+
+    /// Testator (delegated account) Ethereum address (40 hex characters without 0x prefix)
+    #[arg(short, long, default_value = "0000000000000000000000000000000000000000")]
+    testator: String,
 }
 
 #[tokio::main]
@@ -44,6 +48,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .map_err(|_| "Invalid salt hex")?;
     let mut salt = [0u8; 32];
     salt.copy_from_slice(&salt_bytes);
+
+    // Parse testator address
+    let testator_hex = args.testator.trim_start_matches("0x");
+    if testator_hex.len() != 40 {
+        return Err("Testator address must be 40 hex characters (20 bytes)".into());
+    }
+    let testator_bytes = hex::decode(testator_hex)
+        .map_err(|_| "Invalid testator address hex")?;
+    let mut testator_address = [0u8; 20];
+    testator_address.copy_from_slice(&testator_bytes);
 
     // Validate NUIP
     let nuip = args.nuip.clone();
@@ -94,7 +108,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let (proof_bundle, transcript) = tokio::try_join!(
         prover(prover_socket, prover_extra_socket, &server_addr, &uri, recipient, &nuip, salt),
-        verifier(verifier_socket, verifier_extra_socket)
+        verifier(verifier_socket, verifier_extra_socket, testator_address)
     )?;
 
     // Log proof bundle info

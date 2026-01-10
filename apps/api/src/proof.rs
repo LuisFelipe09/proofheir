@@ -125,11 +125,16 @@ pub async fn generate_proof(
     let result = notary::proof_gen::generate_death_proof(recipient, request.nuip, salt, testator_address)
         .await
         .map_err(|e| {
-            tracing::error!("Proof generation failed: {}", e);
+            let error_str = e.to_string();
+            tracing::error!("Proof generation failed: {}", error_str);
+            
+            // Classify errors and return appropriate HTTP status codes
+            let (status, user_message) = classify_proof_error(&error_str);
+            
             (
-                StatusCode::INTERNAL_SERVER_ERROR,
+                status,
                 Json(ErrorResponse {
-                    error: format!("Proof generation failed: {}", e),
+                    error: user_message,
                 }),
             )
         })?;
@@ -144,6 +149,118 @@ pub async fn generate_proof(
         proof: hex::encode(&result.proof),
         public_inputs: result.public_inputs,
     }))
+}
+
+/// Classify proof generation errors and return appropriate HTTP status codes
+/// This prevents the service from crashing due to unhandled errors in prover/verifier
+fn classify_proof_error(error: &str) -> (StatusCode, String) {
+    let error_lower = error.to_lowercase();
+    
+    // ============================================================================
+    // 1. BAD REQUEST (400) - Client input validation errors
+    // ============================================================================
+    if error_lower.contains("invalid nuip")
+        || error_lower.contains("uri must use https")
+        || error_lower.contains("uri must have authority")
+        || error_lower.contains("invalid recipient")
+        || error_lower.contains("invalid salt")
+        || error_lower.contains("invalid testator")
+    {
+        return (
+            StatusCode::BAD_REQUEST,
+            format!("Invalid request parameters: {}", error),
+        );
+    }
+    
+    // ============================================================================
+    // 2. UNPROCESSABLE ENTITY (422) - Business logic errors (subject is alive)
+    // ============================================================================
+    if error_lower.contains("subject is alive")
+        || error_lower.contains("proof of death")
+        || error_lower.contains("vigente (vivo)")
+    {
+        return (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "Cannot generate proof: subject is still alive according to registry".to_string(),
+        );
+    }
+    
+    // ============================================================================
+    // 3. BAD GATEWAY (502) - External service errors (Civil Registry, TLS)
+    // ============================================================================
+    if error_lower.contains("failed to query civil registry")
+        || error_lower.contains("mpc-tls request failed")
+        || error_lower.contains("tls")
+        || error_lower.contains("certificate")
+        || error_lower.contains("connection refused")
+        || error_lower.contains("dns")
+        || error_lower.contains("lookup host")
+        || error_lower.contains("connection reset")
+        || error_lower.contains("timeout")
+    {
+        return (
+            StatusCode::BAD_GATEWAY,
+            format!("External service error: Unable to connect to civil registry. Please try again later. Details: {}", error),
+        );
+    }
+    
+    // ============================================================================
+    // 4. UNPROCESSABLE ENTITY (422) - ZK proof generation/verification errors
+    // ============================================================================
+    if error_lower.contains("prover error")
+        || error_lower.contains("verifier error")
+        || error_lower.contains("zk proof")
+        || error_lower.contains("witness")
+        || error_lower.contains("bytecode")
+        || error_lower.contains("srs")
+        || error_lower.contains("verification key")
+        || error_lower.contains("commitment")
+        || error_lower.contains("hash")
+        || error_lower.contains("noir")
+        || error_lower.contains("barretenberg")
+        || error_lower.contains("computed hash does not match")
+        || error_lower.contains("received commitments")
+        || error_lower.contains("received secrets")
+        || error_lower.contains("no responses found")
+        || error_lower.contains("vigencia field not found")
+        || error_lower.contains("status_commitment")
+        || error_lower.contains("mpc-tls commitment")
+        || error_lower.contains("proof too short")
+    {
+        return (
+            StatusCode::UNPROCESSABLE_ENTITY,
+            format!("ZK proof generation failed: {}. This may indicate an incompatible data format from the registry.", error),
+        );
+    }
+    
+    // ============================================================================
+    // 5. SERVICE UNAVAILABLE (503) - Blockchain/on-chain errors
+    // ============================================================================
+    if error_lower.contains("verifier_private_key")
+        || error_lower.contains("rpc")
+        || error_lower.contains("transaction")
+        || error_lower.contains("send transaction")
+        || error_lower.contains("receipt")
+        || error_lower.contains("reverted")
+        || error_lower.contains("gas")
+        || error_lower.contains("contract")
+        || error_lower.contains("provedeathandregisterheir")
+    {
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            format!("Blockchain service temporarily unavailable: {}. Please try again later.", error),
+        );
+    }
+    
+    // ============================================================================
+    // 6. INTERNAL SERVER ERROR (500) - Unexpected/unknown errors
+    // ============================================================================
+    // Log the full error for debugging but return a generic message
+    tracing::error!("Unclassified error (please add classification): {}", error);
+    (
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "An unexpected error occurred during proof generation. The team has been notified.".to_string(),
+    )
 }
 
 #[cfg(test)]

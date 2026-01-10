@@ -85,14 +85,14 @@ export function ClaimCard() {
 
     // Toggle status for MVP testing
     const handleToggleStatus = async () => {
-        if (!nuipInput || togglingStatus) return
+        if (!nuipInput || togglingStatus || lifeStatus === 'checking' || lifeStatus === 'unknown' || lifeStatus === 'error') return
 
         setTogglingStatus(true)
         try {
             const response = await fetch('/api/toggle-status', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ nuip: nuipInput })
+                body: JSON.stringify({ nuip: nuipInput, currentStatus: lifeStatus })
             })
             const data = await response.json()
 
@@ -439,21 +439,42 @@ export function ClaimCard() {
                                     </div>
                                 )}
 
-                                {lifeStatus === 'alive' && (
-                                    <div className="mt-3 p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
-                                        <div className="flex items-center gap-2 text-sm text-amber-300 mb-2">
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                                            </svg>
-                                            <span className="font-medium">This person is registered as ALIVE</span>
+                                {(lifeStatus === 'alive' || lifeStatus === 'deceased') && (
+                                    <div className={`mt-3 p-3 rounded-lg border ${lifeStatus === 'alive'
+                                            ? 'bg-amber-500/10 border-amber-500/30'
+                                            : 'bg-emerald-500/10 border-emerald-500/30'
+                                        }`}>
+                                        {/* Current Status Display */}
+                                        <div className={`flex items-center gap-2 text-sm mb-2 ${lifeStatus === 'alive' ? 'text-amber-300' : 'text-emerald-300'
+                                            }`}>
+                                            {lifeStatus === 'alive' ? (
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                </svg>
+                                            ) : (
+                                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                </svg>
+                                            )}
+                                            <span className="font-medium">
+                                                Current Status: {lifeStatus === 'alive' ? 'ALIVE' : 'DECEASED'}
+                                            </span>
                                         </div>
-                                        <p className="text-xs text-amber-200/70 mb-3">
-                                            Inheritance cannot be claimed for a living person.
+
+                                        <p className={`text-xs mb-3 ${lifeStatus === 'alive' ? 'text-amber-200/70' : 'text-emerald-200/70'}`}>
+                                            {lifeStatus === 'alive'
+                                                ? 'Inheritance cannot be claimed for a living person.'
+                                                : 'You may proceed with the inheritance claim.'}
                                         </p>
+
+                                        {/* Toggle Button */}
                                         <button
                                             onClick={handleToggleStatus}
                                             disabled={togglingStatus}
-                                            className="w-full py-2 px-3 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/30 rounded-lg text-xs text-amber-200 transition-all flex items-center justify-center gap-2"
+                                            className={`w-full py-2 px-3 rounded-lg text-xs transition-all flex items-center justify-center gap-2 ${lifeStatus === 'alive'
+                                                    ? 'bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/30 text-amber-200'
+                                                    : 'bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-200'
+                                                }`}
                                         >
                                             {togglingStatus ? (
                                                 <>
@@ -468,27 +489,23 @@ export function ClaimCard() {
                                                     <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                                     </svg>
-                                                    Change to Deceased (MVP Only)
+                                                    Change to {lifeStatus === 'alive' ? 'Deceased' : 'Alive'}
                                                 </>
                                             )}
                                         </button>
-                                        <p className="text-[10px] text-slate-500 mt-2 text-center">
-                                            ⚠️ This option is for testing purposes only
-                                        </p>
-                                    </div>
-                                )}
 
-                                {lifeStatus === 'deceased' && (
-                                    <div className="mt-3 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg">
-                                        <div className="flex items-center gap-2 text-sm text-emerald-300">
-                                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                            </svg>
-                                            <span className="font-medium">Registry confirmed: Deceased</span>
+                                        {/* MVP Info Popup */}
+                                        <div className="mt-3 p-2 bg-indigo-500/10 border border-indigo-500/20 rounded-lg">
+                                            <div className="flex items-start gap-2">
+                                                <svg className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                                </svg>
+                                                <div className="text-[11px] text-indigo-200/80">
+                                                    <strong className="text-indigo-300">MVP Testing Mode:</strong> This is a mock civil registry for demonstration purposes.
+                                                    In production, this data would come from an official government source and cannot be modified.
+                                                </div>
+                                            </div>
                                         </div>
-                                        <p className="text-xs text-emerald-200/70 mt-1">
-                                            You may proceed with the inheritance claim.
-                                        </p>
                                     </div>
                                 )}
 

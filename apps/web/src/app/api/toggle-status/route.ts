@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const CIVIL_REGISTRY_URL = process.env.CIVIL_REGISTRY_URL || 'https://civil-registry-mock.onrender.com'
+const CIVIL_REGISTRY_URL = process.env.CIVIL_REGISTRY_URL || 'https://web-production-05160.up.railway.app/'
 
 /**
  * POST /api/toggle-status
- * Changes a person's life status in the civil registry (MVP ONLY)
- * Body: { nuip: string, status?: 'alive' | 'deceased' }
+ * Toggles a person's life status in the civil registry (MVP ONLY)
+ * Body: { nuip: string, currentStatus: 'alive' | 'deceased' }
  * 
  * Uses the civil registry admin endpoint:
  * POST /admin/update-status { nuip: number, status: "Vigente" | "No Vigente (Fallecido)" }
@@ -13,7 +13,7 @@ const CIVIL_REGISTRY_URL = process.env.CIVIL_REGISTRY_URL || 'https://civil-regi
 export async function POST(request: NextRequest) {
     try {
         const body = await request.json()
-        const { nuip, status } = body
+        const { nuip, currentStatus } = body
 
         if (!nuip) {
             return NextResponse.json(
@@ -22,8 +22,8 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // For MVP, always change to deceased (the only use case in claim flow)
-        const targetStatus = 'No Vigente (Fallecido)'
+        // Toggle: if currently alive -> set to deceased, if deceased -> set to alive
+        const targetStatus = currentStatus === 'alive' ? 'No Vigente (Fallecido)' : 'Vigente'
 
         const response = await fetch(`${CIVIL_REGISTRY_URL}/admin/update-status`, {
             method: 'POST',
