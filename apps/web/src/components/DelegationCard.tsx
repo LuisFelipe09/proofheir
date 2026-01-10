@@ -41,7 +41,7 @@ export function DelegationCard() {
 
     const hasEmbeddedWallet = wallets.some(w => w.walletClientType === 'privy')
 
-    // Check delegation status
+    // Check delegation status and if delegated to CURRENT contract
     useEffect(() => {
         const checkDelegation = async () => {
             if (!embeddedWallet || !publicClient) return
@@ -49,11 +49,29 @@ export function DelegationCard() {
                 const code = await publicClient.getBytecode({
                     address: embeddedWallet.address as Address
                 })
-                const alreadyDelegated = code?.startsWith('0xef0100') ?? false
-                setIsDelegated(alreadyDelegated)
 
-                // Auto-advance to step 3 if already delegated
-                if (alreadyDelegated && currentStep === 2 && delegationStatus !== 'success') {
+                // Check if delegated (has EIP-7702 prefix)
+                const hasDelegation = code?.startsWith('0xef0100') ?? false
+
+                // Check if delegated to the CURRENT contract (not an old one)
+                // EIP-7702 delegation code format: 0xef0100 + 20 bytes address
+                if (hasDelegation && code && code.length >= 46) {
+                    const delegatedTo = '0x' + code.slice(8, 48).toLowerCase()
+                    const currentContract = PROOF_HEIR_ADDRESS.toLowerCase()
+
+                    // Only consider "delegated" if it's to the current contract
+                    const delegatedToCurrentContract = delegatedTo === currentContract
+                    setIsDelegated(delegatedToCurrentContract)
+
+                    if (!delegatedToCurrentContract) {
+                        console.log('Wallet delegated to OLD contract:', delegatedTo, 'Current:', currentContract)
+                    }
+                } else {
+                    setIsDelegated(false)
+                }
+
+                // Auto-advance to step 3 if already delegated to current contract
+                if (isDelegated && currentStep === 2 && delegationStatus !== 'success') {
                     setDelegationStatus('success')
                 }
             } catch (e) {
@@ -63,7 +81,7 @@ export function DelegationCard() {
         checkDelegation()
         const interval = setInterval(checkDelegation, 5000)
         return () => clearInterval(interval)
-    }, [embeddedWallet, publicClient, currentStep, delegationStatus])
+    }, [embeddedWallet, publicClient, currentStep, delegationStatus, isDelegated])
 
     // Token selection is now handled by TokenSelector component
 
