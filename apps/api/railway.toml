@@ -1,0 +1,15 @@
+# Railway configuration for ProofHeir API
+# Force Docker build instead of Nixpacks
+
+[build]
+# Use the Dockerfile in this directory
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# Number of replicas
+numReplicas = 1
+# Health check path
+healthcheckPath = "/health"
+# Restart policy
+restartPolicyType = "ON_FAILURE"
