@@ -6,8 +6,6 @@
 builder = "dockerfile"
 # Path to Dockerfile relative to root directory setting in Railway
 dockerfilePath = "apps/api/Dockerfile"
-# Watch paths for rebuilds
-watchPatterns = ["apps/api/**", "packages/notary/**", "Cargo.toml", "Cargo.lock"]
 
 [deploy]
 numReplicas = 1
