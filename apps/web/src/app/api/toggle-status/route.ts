@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const CIVIL_REGISTRY_URL = process.env.CIVIL_REGISTRY_URL || 'https://web-production-05160.up.railway.app/'
+const CIVIL_REGISTRY_URL = process.env.CIVIL_REGISTRY_URL || 'https://web-production-05160.up.railway.app'
 
 /**
  * POST /api/toggle-status
