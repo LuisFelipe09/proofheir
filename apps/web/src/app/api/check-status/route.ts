@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const CIVIL_REGISTRY_URL = process.env.CIVIL_REGISTRY_URL || 'https://civil-registry-mock.onrender.com'
+const CIVIL_REGISTRY_URL = process.env.CIVIL_REGISTRY_URL || 'https://web-production-05160.up.railway.app'
 
 /**
  * GET /api/check-status?nuip=123456789

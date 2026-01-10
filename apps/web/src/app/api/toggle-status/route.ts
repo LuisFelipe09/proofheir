@@ -22,8 +22,15 @@ export async function POST(request: NextRequest) {
             )
         }
 
-        // Toggle: if currently alive -> set to deceased, if deceased -> set to alive
-        const targetStatus = currentStatus === 'alive' ? 'No Vigente (Fallecido)' : 'Vigente'
+        // Only allow setting status to deceased (one-way operation for MVP)
+        if (currentStatus === 'deceased') {
+            return NextResponse.json(
+                { error: 'Cannot change status: person is already deceased' },
+                { status: 400 }
+            )
+        }
+
+        const targetStatus = 'No Vigente (Fallecido)'
 
         const response = await fetch(`${CIVIL_REGISTRY_URL}/admin/update-status`, {
             method: 'POST',

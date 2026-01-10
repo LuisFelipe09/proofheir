@@ -441,8 +441,8 @@ export function ClaimCard() {
 
                                 {(lifeStatus === 'alive' || lifeStatus === 'deceased') && (
                                     <div className={`mt-3 p-3 rounded-lg border ${lifeStatus === 'alive'
-                                            ? 'bg-amber-500/10 border-amber-500/30'
-                                            : 'bg-emerald-500/10 border-emerald-500/30'
+                                        ? 'bg-amber-500/10 border-amber-500/30'
+                                        : 'bg-emerald-500/10 border-emerald-500/30'
                                         }`}>
                                         {/* Current Status Display */}
                                         <div className={`flex items-center gap-2 text-sm mb-2 ${lifeStatus === 'alive' ? 'text-amber-300' : 'text-emerald-300'
@@ -467,32 +467,31 @@ export function ClaimCard() {
                                                 : 'You may proceed with the inheritance claim.'}
                                         </p>
 
-                                        {/* Toggle Button */}
-                                        <button
-                                            onClick={handleToggleStatus}
-                                            disabled={togglingStatus}
-                                            className={`w-full py-2 px-3 rounded-lg text-xs transition-all flex items-center justify-center gap-2 ${lifeStatus === 'alive'
-                                                    ? 'bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/30 text-amber-200'
-                                                    : 'bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/30 text-emerald-200'
-                                                }`}
-                                        >
-                                            {togglingStatus ? (
-                                                <>
-                                                    <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
-                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
-                                                    </svg>
-                                                    Updating...
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                                    </svg>
-                                                    Change to {lifeStatus === 'alive' ? 'Deceased' : 'Alive'}
-                                                </>
-                                            )}
-                                        </button>
+                                        {/* Mark as Deceased Button - Only show when alive */}
+                                        {lifeStatus === 'alive' && (
+                                            <button
+                                                onClick={handleToggleStatus}
+                                                disabled={togglingStatus}
+                                                className="w-full py-2 px-3 rounded-lg text-xs transition-all flex items-center justify-center gap-2 bg-amber-600/20 hover:bg-amber-600/30 border border-amber-500/30 text-amber-200"
+                                            >
+                                                {togglingStatus ? (
+                                                    <>
+                                                        <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                                                        </svg>
+                                                        Updating...
+                                                    </>
+                                                ) : (
+                                                    <>
+                                                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                                        </svg>
+                                                        Mark as Deceased (MVP Testing)
+                                                    </>
+                                                )}
+                                            </button>
+                                        )}
 
                                         {/* MVP Info Popup */}
                                         <div className="mt-3 p-2 bg-indigo-500/10 border border-indigo-500/20 rounded-lg">
