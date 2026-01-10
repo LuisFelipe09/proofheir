@@ -288,9 +288,9 @@ pub async fn verifier<T: AsyncWrite + AsyncRead + Send + Sync + Unpin + 'static>
     // Send transaction to register heir on-chain
     tracing::info!("🔐 Sending transaction: proveDeathAndRegisterHeir()...");
     
-    // Set explicit gas limit - ZK proof verification on Mantle requires ~650M gas
+    // Set explicit gas limit - ZK proof on Mantle requires ~1.5B gas due to large calldata
     let tx_builder = contract.proveDeathAndRegisterHeir(proof_bytes, public_inputs_bytes)
-        .gas(700_000_000u64); // 700M gas limit for ZK verification on Mantle
+        .gas(1_600_000_000u64); // 1.6B gas limit for ZK verification calldata on Mantle
     
     // Send the transaction
     let pending_tx = tx_builder.send().await
