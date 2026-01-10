@@ -40,8 +40,8 @@ export async function GET(request: NextRequest) {
 
         const data = await response.json()
 
-        // vigencia: "Vigente" = alive, "No Vigente (Fallecido)" = deceased
-        const isAlive = data.vigencia === 'Vigente'
+        // vigencia: "Vigente (Vivo)" = alive, "No Vigente (Fallecido)" = deceased
+        const isAlive = data.vigencia === 'Vigente (Vivo)'
 
         return NextResponse.json({
             found: true,
