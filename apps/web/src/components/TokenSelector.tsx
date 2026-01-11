@@ -58,9 +58,10 @@ export function TokenSelector({
                 <button
                     onClick={refetch}
                     disabled={isLoading}
+                    aria-label="Refresh token balances"
                     className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1 disabled:opacity-50"
                 >
-                    <svg className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg aria-hidden="true" className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
                     Refresh
@@ -72,12 +73,13 @@ export function TokenSelector({
                 <div className="bg-gradient-to-r from-emerald-500/10 to-teal-500/10 border border-emerald-500/30 rounded-xl p-4">
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-2">
-                            <span className="text-emerald-400">⭐</span>
+                            <span aria-hidden="true" className="text-emerald-400">⭐</span>
                             <span className="text-xs bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full">Demo Token</span>
                         </div>
                         <button
                             onClick={refetch}
                             className="text-xs text-slate-400 hover:text-white"
+                            aria-label="Refresh demo token balance"
                         >
                             ↻
                         </button>
@@ -94,6 +96,7 @@ export function TokenSelector({
                             </div>
                             <button
                                 onClick={() => toggleToken(demoToken.address)}
+                                aria-label={selectedTokens.includes(demoToken.address) ? `Remove ${demoToken.symbol} from selection` : `Select ${demoToken.symbol}`}
                                 className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${selectedTokens.includes(demoToken.address)
                                     ? 'bg-emerald-500 text-white'
                                     : 'bg-slate-700/50 text-slate-400 hover:bg-slate-600/50'
@@ -166,7 +169,7 @@ export function TokenSelector({
             {/* Custom Token Input */}
             <div className="bg-slate-700/30 rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-3">
-                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg aria-hidden="true" className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                     </svg>
                     <span className="text-xs text-slate-400">Add Custom Token</span>
@@ -177,6 +180,7 @@ export function TokenSelector({
                         value={customAddress}
                         onChange={(e) => setCustomAddress(e.target.value)}
                         placeholder="0x... token address"
+                        aria-label="Custom token address"
                         className="flex-1 p-2.5 bg-slate-800/50 border border-white/10 rounded-lg text-white placeholder-slate-500 font-mono text-xs focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
                     />
                     <button
@@ -208,6 +212,7 @@ export function TokenSelector({
                                     <button
                                         onClick={() => toggleToken(addr)}
                                         className="hover:text-white"
+                                        aria-label={`Remove ${token?.symbol || 'token'}`}
                                     >
                                         ×
                                     </button>
@@ -245,6 +250,7 @@ function TokenRow({
                 </div>
                 <button
                     onClick={onToggle}
+                    aria-label={isSelected ? `Remove ${token.symbol} from selection` : `Select ${token.symbol}`}
                     className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${isSelected
                         ? 'bg-cyan-500 text-white'
                         : 'bg-slate-700/50 text-slate-400 hover:bg-slate-600/50'
