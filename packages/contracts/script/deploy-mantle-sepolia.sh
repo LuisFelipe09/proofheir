@@ -46,6 +46,13 @@ if [ -z "$CIVIL_REGISTRY_DOMAIN" ]; then
   echo -e "${YELLOW}ℹ️  Using default CIVIL_REGISTRY_DOMAIN: ${CIVIL_REGISTRY_DOMAIN}${NC}"
 fi
 
+# Check for trusted verifier address (backend wallet that verifies ZK proofs off-chain)
+if [ -z "$TRUSTED_VERIFIER_ADDRESS" ]; then
+  echo -e "${YELLOW}ℹ️  TRUSTED_VERIFIER_ADDRESS not set - will use deployer address${NC}"
+else
+  echo -e "${GREEN}🔐 Trusted verifier: ${TRUSTED_VERIFIER_ADDRESS}${NC}"
+fi
+
 # Network configuration
 RPC_URL="https://rpc.sepolia.mantle.xyz"
 CHAIN_ID=5003

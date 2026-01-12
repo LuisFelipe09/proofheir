@@ -42,7 +42,7 @@ contract VerifierIntegrationTest is Test {
         verifier = new HonkVerifier();
         
         // Deploy ProofHeir with real verifier
-        proofHeir = new ProofHeir(address(verifier), TRUSTED_SERVER_DOMAIN);
+        proofHeir = new ProofHeir(address(verifier), TRUSTED_SERVER_DOMAIN, address(this));
 
         tokenA.mint(BOB_ADDRESS, 1000);
     }

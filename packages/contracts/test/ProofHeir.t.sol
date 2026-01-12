@@ -32,7 +32,7 @@ contract ProofHeirTest is Test {
         verifier = new MockVerifier();
         
         // Deploy ProofHeir implementation with trusted server domain
-        proofHeir = new ProofHeir(address(verifier), TRUSTED_SERVER_DOMAIN);
+        proofHeir = new ProofHeir(address(verifier), TRUSTED_SERVER_DOMAIN, address(this));
 
         // Mint tokens to Bob
         tokenA.mint(BOB_ADDRESS, 1000);

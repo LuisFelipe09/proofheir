@@ -1,5 +1,5 @@
-use crate::types::{received_commitments, ZKProofBundle};
-use noir::barretenberg::verify::{get_ultra_honk_verification_key, verify_ultra_honk};
+use crate::types::{received_commitments, serialize_public_inputs_for_solidity, ZKProofBundle};
+use noir::barretenberg::verify::{get_ultra_honk_verification_key};
 use serde_json::Value;
 use tlsn::{
     config::{CertificateDer, ProtocolConfigValidator, RootCertStore},
@@ -13,7 +13,7 @@ use tokio_util::compat::TokioAsyncReadCompatExt;
 use tracing::instrument;
 use alloy::{
     network::EthereumWallet,
-    primitives::{Address, FixedBytes},
+    primitives::{Address, Bytes, FixedBytes},
     providers::ProviderBuilder,
     signers::local::PrivateKeySigner,
     sol,
@@ -29,14 +29,6 @@ sol! {
     #[sol(rpc)]
     contract ProofHeir {
         function proveDeathAndRegisterHeir(bytes calldata proof, bytes32[] calldata publicInputs) external;
-        
-        /// @notice Off-chain verification pattern: backend verifies ZK proof and submits hash + result
-        function registerHeirWithProofHash(
-            bytes32 _proofHash,
-            address _heir,
-            bytes32 _idCommitment,
-            bytes32 _serverHash
-        ) external;
         
         event HeirRegistered(address indexed owner, address indexed heir);
     }
@@ -169,24 +161,6 @@ pub async fn verifier<T: AsyncWrite + AsyncRead + Send + Sync + Unpin + 'static>
     tracing::info!("✅ ZK Proof Public Input matches MPC-TLS commitment!");
 
     // ========================================================================
-    // LOCAL ZK PROOF VERIFICATION (Off-chain pattern)
-    // ========================================================================
-    // Instead of sending the full proof to the contract for on-chain verification
-    // (which is too expensive on Mantle), we verify locally and submit a hash.
-    
-    tracing::info!("🔐 Verifying ZK proof locally (off-chain)...");
-    
-    let is_valid = verify_ultra_honk(proof.clone(), vk.clone())
-        .map_err(|e| format!("ZK Proof local verification failed: {}", e))?;
-    
-    if !is_valid {
-        tracing::error!("❌ ZK Proof failed local verification!");
-        return Err("ZK Proof verification failed".into());
-    }
-    
-    tracing::info!("✅ ZK Proof verified locally!");
-
-    // ========================================================================
     // SEND TRANSACTION TO VERIFY PROOF AND REGISTER HEIR ON-CHAIN
     // ========================================================================
     
@@ -221,53 +195,122 @@ pub async fn verifier<T: AsyncWrite + AsyncRead + Send + Sync + Unpin + 'static>
     tracing::info!("📊 DEBUG - Proof server_hash: {:?}", msg.public_inputs.server_hash);
     tracing::info!("📊 DEBUG - Proof recipient: {:?}", msg.public_inputs.recipient);
     
+    // Serialize public inputs to Solidity format (116 fields)
+    let public_inputs_hex = serialize_public_inputs_for_solidity(
+        msg.public_inputs.recipient,
+        msg.public_inputs.server_hash,
+        msg.public_inputs.id_commitment,
+        &status_commitment_from_proof,
+    )?;
+    
+    // Convert to FixedBytes<32> array for contract call
+    let public_inputs_bytes: Vec<FixedBytes<32>> = public_inputs_hex
+        .iter()
+        .map(|hex_str| {
+            let hex_str = hex_str.trim_start_matches("0x");
+            let bytes = hex::decode(hex_str).expect("Invalid hex in public inputs");
+            FixedBytes::<32>::from_slice(&bytes)
+        })
+        .collect();
+    
+    // Convert proof to Bytes
+    
+    // ------------------------------------------------------------------------
+    // HANDLING PROOF SIZE MISMATCH (noir-rs vs Solidity Verifier)
+    // ------------------------------------------------------------------------
+    
+    // We calculate the number of public input fields dynamically based on the 
+    // serialization logic defined in `types.rs`. This ensures that if the 
+    // circuit inputs change, this logic adapts automatically.
+    
+    // Temporarily serialize inputs using the commitment provided in the bundle
+    // (We certify that this matches the proof later)
+    let temp_public_inputs_hex = serialize_public_inputs_for_solidity(
+        msg.public_inputs.recipient,
+        msg.public_inputs.server_hash,
+        msg.public_inputs.id_commitment,
+        &msg.public_inputs.status_commitment,
+    )?;
+    
+    let public_inputs_field_count = temp_public_inputs_hex.len();
+    let public_inputs_size_bytes = public_inputs_field_count * 32;
+    
+    // Check if proof contains concatenated public inputs
+    let proof_size_elements = proof.len() / 32;
+    
+    // If the proof is significantly larger than the inputs, and matches the 
+    // pattern of "Inputs + Proof", we slice. 
+    // (We don't hardcode 508 here, but assume anything larger than inputs 
+    // by a reasonable margin (e.g. > 1KB) likely includes the proof)
+    
+    let final_proof = if proof.len() > public_inputs_size_bytes && proof.len() % 32 == 0 {
+         // Heuristic: If proof starts with public inputs? 
+         // Since we can't easily verify the "Proof" part without verification,
+         // we assume that if it's the "Concatenated" style, it will be:
+         // Size = PublicInputsSize + PureProofSize
+         
+         // For safety against regression where noir-rs might NOT concatenate, 
+         // we check if slicing would leave a "valid-looking" proof size.
+         // UltraHonk proofs are usually around ~16KB (500+ fields).
+         
+         if proof.len() > public_inputs_size_bytes + 10000 { 
+             tracing::info!("💡 Detected Concatenated Proof ({} elements).", proof_size_elements);
+             tracing::info!("   Public Inputs count: {} elements.", public_inputs_field_count);
+             tracing::info!("   Action: Slicing off first {} bytes.", public_inputs_size_bytes);
+             
+             proof[public_inputs_size_bytes..].to_vec()
+         } else {
+             proof.clone()
+         }
+    } else {
+        proof.clone()
+    };
+    
+    let proof_bytes = Bytes::from(final_proof.clone()); // Use final_proof for transaction
+
+    // Validate Status Commitment extraction from the ORIGINAL full proof or the FINAL proof?
+    // If we sliced it, the final_proof does NOT contain the public inputs anymore.
+    // So we can't extract them from `final_proof`.
+    // But we need to verify that the proof actually "binds" those inputs.
+    
+    // Wait, if `proof` (the original) has inputs concatenated, they are at the beginning.
+    // The PROOF ITSELF (the zk part) doesn't "contain" the inputs in plain text, 
+    // it contains cryptographic commitments to them.
+    
+    // The logic below (lines 137+) was trying to extract `status_commitment` from 
+    // the proof by assuming offsets.
+    // `start_offset = (20 + 32 + 32) * 32` -> This offset is into the PUBLIC INPUTS section.
+    // So we MUST use the `proof` (original concatenated variable) to extract this check, 
+    // NOT `final_proof`.
+    
+    // ... existing logic uses `proof` variable ...
+    
     // Create contract instance pointing to the TESTATOR'S DELEGATED ACCOUNT
     // This is the key change: we call the function on the testator's account,
     // not on the ProofHeir contract address directly
     let contract = ProofHeir::new(testator_addr, &provider);
     
-    // ========================================================================
-    // OFF-CHAIN VERIFICATION PATTERN
-    // ========================================================================
-    // Instead of calling proveDeathAndRegisterHeir with the full proof (too expensive),
-    // we call registerHeirWithProofHash with:
-    // 1. proofHash: keccak256(proof) as commitment to the verified proof
-    // 2. heir: extracted from public inputs
-    // 3. idCommitment: extracted from public inputs
-    // 4. serverHash: extracted from public inputs
-    
-    // Compute proof hash (commitment to the verified proof)
-    use alloy::primitives::keccak256;
-    let proof_hash = keccak256(&proof);
-    tracing::info!("📊 Proof hash (keccak256): 0x{}", hex::encode(proof_hash.as_slice()));
-    
-    // Extract heir address from public inputs (first 20 bytes)
-    let heir_address = Address::from_slice(&msg.public_inputs.recipient);
-    tracing::info!("📊 Heir address: {:?}", heir_address);
-    
-    // Convert id_commitment and server_hash to FixedBytes<32>
-    let id_commitment = FixedBytes::<32>::from_slice(&msg.public_inputs.id_commitment);
-    let server_hash = FixedBytes::<32>::from_slice(&msg.public_inputs.server_hash);
-    
-    tracing::info!("🔐 Sending transaction: registerHeirWithProofHash()...");
+    // Send transaction to register heir on-chain
+    tracing::info!("🔐 Sending transaction: proveDeathAndRegisterHeir()...");
     tracing::info!("📊 DEBUG - Testator address: {:?}", testator_addr);
-    tracing::info!("📊 DEBUG - Heir address: {:?}", heir_address);
-    tracing::info!("📊 DEBUG - Proof hash: {:?}", proof_hash);
+    tracing::info!("📊 DEBUG - Proof size: {} bytes", proof_bytes.len());
+    tracing::info!("📊 DEBUG - Public inputs count: {} elements", public_inputs_bytes.len());
     
-    // Gas limit for off-chain pattern is much lower (no ZK verification)
+    // Log first few public inputs for debugging
+    if !public_inputs_bytes.is_empty() {
+        tracing::info!("📊 DEBUG - First public input (recipient byte 0): {:?}", public_inputs_bytes[0]);
+    }
+    
+    // Gas limit configurable via env var (default 1.6B for Mantle ZK calldata)
     let gas_limit: u64 = env::var("GAS_LIMIT")
         .ok()
         .and_then(|v| v.parse().ok())
-        .unwrap_or(500_000); // Default 500k for simple storage operation
+        .unwrap_or(2_500_000_000);
     
     tracing::info!("⛽ Using gas limit: {}", gas_limit);
     
-    let tx_builder = contract.registerHeirWithProofHash(
-        proof_hash,
-        heir_address,
-        id_commitment,
-        server_hash
-    ).gas(gas_limit);
+    let tx_builder = contract.proveDeathAndRegisterHeir(proof_bytes, public_inputs_bytes)
+        .gas(gas_limit);
     
     // Send the transaction
     let pending_tx = tx_builder.send().await
@@ -288,7 +331,7 @@ pub async fn verifier<T: AsyncWrite + AsyncRead + Send + Sync + Unpin + 'static>
     
     if receipt.status() {
         tracing::info!("✅ Transaction confirmed in block: {}", receipt.block_number.unwrap_or(0));
-        tracing::info!("✅ Off-chain proof verified, hash committed on-chain!");
+        tracing::info!("✅ On-chain proof verification succeeded!");
         tracing::info!("✅ Heir registered in testator's delegated account storage!");
         tracing::info!("⛽ Gas used: {}", receipt.gas_used);
     } else {

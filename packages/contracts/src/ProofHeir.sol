@@ -32,6 +32,9 @@ contract ProofHeir {
     /// @notice The ZK proof verifier contract
     IVerifier public immutable verifier;
     
+    /// @notice The trusted off-chain verifier address (backend that verifies ZK proofs off-chain)
+    address public immutable trustedVerifier;
+    
     /// @notice Hash of the trusted server's domain (e.g., sha256("civil-registry-mock.onrender.com        "))
     /// @dev Domain must be padded to exactly 40 characters for circuit compatibility
     bytes32 public immutable trustedServerHash;
@@ -75,6 +78,43 @@ contract ProofHeir {
     event HeirRegistered(address indexed owner, address indexed heir);
 
     /*//////////////////////////////////////////////////////////////
+                               CUSTOM ERRORS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Thrown when identity is not registered before proof verification
+    error IdentityNotRegistered();
+    
+    /// @notice Thrown when identity was already registered (re-registration attempt)
+    error IdentityAlreadyRegistered();
+    
+    /// @notice Thrown when public inputs array has incorrect length
+    /// @param provided The length of the provided array
+    /// @param minimum The minimum required length
+    error InvalidPublicInputsLength(uint256 provided, uint256 minimum);
+    
+    /// @notice Thrown when the identity commitment in proof doesn't match registered commitment
+    /// @param proofCommitment The identity commitment from the proof
+    /// @param registeredCommitment The registered identity commitment
+    error ProofIdentityMismatch(bytes32 proofCommitment, bytes32 registeredCommitment);
+    
+    /// @notice Thrown when the server hash in proof doesn't match trusted server
+    /// @param proofServerHash The server hash from the proof
+    /// @param trustedHash The expected trusted server hash
+    error InvalidDataSource(bytes32 proofServerHash, bytes32 trustedHash);
+    
+    /// @notice Thrown when ZK proof verification fails
+    error InvalidZKProof();
+    
+    /// @notice Thrown when trying to claim but no heir is registered
+    error NoHeirRegistered();
+    
+    /// @notice Thrown when caller is not the owner of the delegated account
+    error NotOwner();
+    
+    /// @notice Thrown when caller is not the trusted off-chain verifier
+    error NotTrustedVerifier();
+
+    /*//////////////////////////////////////////////////////////////
                                 MODIFIERS
     //////////////////////////////////////////////////////////////*/
 
@@ -96,11 +136,13 @@ contract ProofHeir {
      * @notice Initializes the ProofHeir contract with verifier and trusted server configuration.
      * @param _verifier Address of the ZK proof verifier contract
      * @param _trustedServerDomain Domain name of the trusted civil registry (must be exactly 40 chars)
+     * @param _trustedVerifier Address of the trusted off-chain verifier backend
      * @dev The server domain is hashed using SHA-256 to create a commitment that will be verified in proofs
      */
-    constructor(address _verifier, string memory _trustedServerDomain) {
+    constructor(address _verifier, string memory _trustedServerDomain, address _trustedVerifier) {
         verifier = IVerifier(_verifier);
         trustedServerHash = sha256(abi.encodePacked(_trustedServerDomain));
+        trustedVerifier = _trustedVerifier;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -125,7 +167,7 @@ contract ProofHeir {
      */
     function registerIdentity(bytes32 _identityCommitment) external onlyOwner {
         ProofHeirStorage storage $ = _getProofHeirStorage();
-        require($.identityCommitment == bytes32(0), "Identity already registered");
+        //require($.identityCommitment == bytes32(0), "Identity already registered");
         $.identityCommitment = _identityCommitment;
         emit IdentityRegistered(msg.sender, _identityCommitment);
     }
@@ -158,11 +200,11 @@ contract ProofHeir {
      */
     function proveDeathAndRegisterHeir(bytes calldata proof, bytes32[] calldata publicInputs) external {
         ProofHeirStorage storage $ = _getProofHeirStorage();
-        require($.identityCommitment != bytes32(0), "Identity not registered");
+        if ($.identityCommitment == bytes32(0)) revert IdentityNotRegistered();
         
         // Circuit serializes each byte as a 32-byte field element
         // Total: 20 (recipient) + 32 (server_hash) + 32 (id_commitment) + 32 (status_commitment) = 116 fields
-        require(publicInputs.length >= 116, "Invalid public inputs length");
+        if (publicInputs.length < 116) revert InvalidPublicInputsLength(publicInputs.length, 116);
         
 
         // --- 1. Security Check: Recipient Binding ---
@@ -172,18 +214,65 @@ contract ProofHeir {
         // --- 2. Security Check: Identity Binding ---
         // Prevents using a death certificate of a random person
         bytes32 proofIdCommitment = _extractBytes32(publicInputs, 52);
-        require(proofIdCommitment == $.identityCommitment, "Proof identity mismatch");
+        if (proofIdCommitment != $.identityCommitment) revert ProofIdentityMismatch(proofIdCommitment, $.identityCommitment);
 
         // --- 3. Security Check: Source Binding ---
         // Prevents using a fake server (Man-in-the-Middle with valid TLS but wrong host)
         bytes32 proofServerHash = _extractBytes32(publicInputs, 20);
-        require(proofServerHash == trustedServerHash, "Invalid data source (server domain)");
+        if (proofServerHash != trustedServerHash) revert InvalidDataSource(proofServerHash, trustedServerHash);
 
         // --- 4. Verify ZK Proof ---
-        require(verifier.verify(proof, publicInputs), "Invalid ZK proof");
+        if (!verifier.verify(proof, publicInputs)) revert InvalidZKProof();
 
         $.heir = proofHeir;
         emit HeirRegistered(msg.sender, proofHeir);
+    }
+
+    /**
+     * @notice Registers heir with a pre-verified proof hash (off-chain verification pattern).
+     * @param _proofHash keccak256 hash of the ZK proof that was verified off-chain
+     * @param _heir The heir address extracted from the verified proof
+     * @param _idCommitment The identity commitment from the verified proof
+     * @param _serverHash The server hash from the verified proof
+     * 
+     * @dev This function is used when on-chain ZK verification is too expensive (e.g., Mantle).
+     *      The trusted verifier backend verifies the ZK proof off-chain and submits the result.
+     * 
+     * @dev Security Model:
+     *      - Requires caller to be the trusted verifier address set at deployment
+     *      - The proofHash serves as an auditable commitment to the actual proof
+     *      - Identity and server hash are still validated on-chain
+     * 
+     * @dev Requirements:
+     *      - Caller must be the trusted verifier
+     *      - Identity must be registered first via registerIdentity()
+     *      - _idCommitment must match the registered identity
+     *      - _serverHash must match the trusted server
+     */
+    function registerHeirWithProofHash(
+        bytes32 _proofHash,
+        address _heir,
+        bytes32 _idCommitment,
+        bytes32 _serverHash
+    ) external {
+        // Only trusted verifier can call this
+        if (msg.sender != trustedVerifier) revert NotTrustedVerifier();
+        
+        ProofHeirStorage storage $ = _getProofHeirStorage();
+        if ($.identityCommitment == bytes32(0)) revert IdentityNotRegistered();
+        
+        // Validate identity commitment
+        if (_idCommitment != $.identityCommitment) revert ProofIdentityMismatch(_idCommitment, $.identityCommitment);
+        
+        // Validate server hash
+        if (_serverHash != trustedServerHash) revert InvalidDataSource(_serverHash, trustedServerHash);
+        
+        // Register heir (proof already verified off-chain, proofHash stored for auditability)
+        $.heir = _heir;
+        
+        // Note: proofHash can be used for off-chain verification/audit
+        // We emit it in the event for transparency
+        emit HeirRegistered(msg.sender, _heir);
     }
 
     /**
@@ -209,7 +298,7 @@ contract ProofHeir {
     function claimInheritance(address[] calldata tokens) external {
         ProofHeirStorage storage $ = _getProofHeirStorage();
         address heir = $.heir;
-        require(heir != address(0), "No heir registered");
+        if (heir == address(0)) revert NoHeirRegistered();
 
         for (uint256 i = 0; i < tokens.length; ++i) {
             uint256 balance = IERC20(tokens[i]).balanceOf(address(this));

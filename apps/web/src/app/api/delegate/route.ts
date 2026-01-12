@@ -1,9 +1,16 @@
 import { NextResponse } from 'next/server'
-import { createWalletClient, createPublicClient, http, type Address, type Hex } from 'viem'
+import { createWalletClient, createPublicClient, http, type Address, type Hex, type Chain } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
-import { mantleSepoliaTestnet } from 'viem/chains'
+import { mantleSepoliaTestnet, anvil } from 'viem/chains'
 
 const rpcUrl = process.env.NEXT_PUBLIC_RPC_URL || 'http://127.0.0.1:8545'
+const chainId = parseInt(process.env.NEXT_PUBLIC_CHAIN_ID || '31337')
+
+// Get chain based on environment
+function getChain(): Chain {
+    if (chainId === 5003) return mantleSepoliaTestnet
+    return anvil // Default to anvil for local development
+}
 
 // Helper to get sponsor client - created lazily to avoid build-time errors
 function getSponsorClient() {
@@ -17,14 +24,14 @@ function getSponsorClient() {
 
     return createWalletClient({
         account: sponsorAccount,
-        chain: mantleSepoliaTestnet,
+        chain: getChain(),
         transport: http(rpcUrl)
     })
 }
 
 function getPublicClient() {
     return createPublicClient({
-        chain: mantleSepoliaTestnet,
+        chain: getChain(),
         transport: http(rpcUrl)
     })
 }

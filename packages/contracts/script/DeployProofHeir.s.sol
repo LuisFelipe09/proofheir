@@ -15,9 +15,9 @@ contract DeployProofHeir is Script {
 
         address targetWallet = 0xC7617F5aC47db5b237bCc7Eb1B2C3E1Da0Bac3f8;
         
-        // 1. Deploy Verifier (using Mock for now)
+        // 1. Deploy HonkVerifier (testing ZK verification on Anvil)
         HonkVerifier verifier = new HonkVerifier();
-        console.log("MockVerifier deployed at:", address(verifier));
+        console.log("HonkVerifier deployed at:", address(verifier));
 
         // 2. Deploy ProofHeir
         // Read trusted server domain from environment and pad to 40 characters
@@ -39,7 +39,11 @@ contract DeployProofHeir is Script {
         console.log("Domain length:", bytes(trustedServerDomain).length);
         console.log("Domain value:", trustedServerDomain);
         
-        ProofHeir proofHeir = new ProofHeir(address(verifier), trustedServerDomain);
+        // Get trusted verifier address from env (the backend wallet that verifies proofs off-chain)
+        address trustedVerifierAddr = vm.envOr("TRUSTED_VERIFIER_ADDRESS", msg.sender);
+        console.log("Trusted verifier:", trustedVerifierAddr);
+        
+        ProofHeir proofHeir = new ProofHeir(address(verifier), trustedServerDomain, trustedVerifierAddr);
         console.log("ProofHeir deployed at:", address(proofHeir));
 
         // 3. Deploy MockERC20
