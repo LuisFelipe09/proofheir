@@ -288,16 +288,9 @@ pub async fn verifier<T: AsyncWrite + AsyncRead + Send + Sync + Unpin + 'static>
     // Send transaction to register heir on-chain
     tracing::info!("🔐 Sending transaction: proveDeathAndRegisterHeir()...");
     
-    // Gas limit configurable via env var (default 1.6B for Mantle ZK calldata)
-    let gas_limit: u64 = env::var("GAS_LIMIT")
-        .ok()
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(1_600_000_000);
-    
-    tracing::info!("⛽ Using gas limit: {}", gas_limit);
-    
-    let tx_builder = contract.proveDeathAndRegisterHeir(proof_bytes, public_inputs_bytes)
-        .gas(gas_limit);
+    // Let the provider estimate gas (required for Mantle's L1+L2 cost calculation)
+    // Mantle requires estimateGas to calculate l1Cost correctly
+    let tx_builder = contract.proveDeathAndRegisterHeir(proof_bytes, public_inputs_bytes);
     
     // Send the transaction
     let pending_tx = tx_builder.send().await

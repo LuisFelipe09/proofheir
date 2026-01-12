@@ -46,3 +46,9 @@ Thumbs.db
 .next
 out
 .env.local
+
+# Environment files (secrets)
+.env
+.env.*
+!.env.example
+!.env.*.example
