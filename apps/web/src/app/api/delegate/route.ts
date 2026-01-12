@@ -1,13 +1,27 @@
 import { NextResponse } from 'next/server'
 import { createWalletClient, createPublicClient, http, type Address, type Hex } from 'viem'
 import { privateKeyToAccount } from 'viem/accounts'
-import { mantleSepoliaTestnet } from 'viem/chains'
+import { anvil, mantleSepoliaTestnet, mantle } from 'viem/chains'
 
 const rpcUrl = process.env.NEXT_PUBLIC_RPC_URL || 'http://127.0.0.1:8545'
+const chainId = parseInt(process.env.NEXT_PUBLIC_CHAIN_ID || '31337')
+
+// Get the active chain based on chain ID
+function getActiveChain() {
+    switch (chainId) {
+        case 5003:
+            return mantleSepoliaTestnet
+        case 5000:
+            return mantle
+        default:
+            return anvil // Default to local Anvil
+    }
+}
 
 // Helper to get sponsor client - created lazily to avoid build-time errors
 function getSponsorClient() {
     const sponsorKey = process.env.SPONSOR_PRIVATE_KEY as Hex
+    const chain = getActiveChain()
 
     if (!sponsorKey) {
         throw new Error('Missing SPONSOR_PRIVATE_KEY environment variable')
@@ -17,14 +31,15 @@ function getSponsorClient() {
 
     return createWalletClient({
         account: sponsorAccount,
-        chain: mantleSepoliaTestnet,
+        chain,
         transport: http(rpcUrl)
     })
 }
 
 function getPublicClient() {
+    const chain = getActiveChain()
     return createPublicClient({
-        chain: mantleSepoliaTestnet,
+        chain,
         transport: http(rpcUrl)
     })
 }

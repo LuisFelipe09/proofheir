@@ -75,6 +75,43 @@ contract ProofHeir {
     event HeirRegistered(address indexed owner, address indexed heir);
 
     /*//////////////////////////////////////////////////////////////
+                               CUSTOM ERRORS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @notice Thrown when identity is not registered before proof verification
+    error IdentityNotRegistered();
+
+    /// @notice Thrown when identity was already registered (re-registration attempt)
+    error IdentityAlreadyRegistered();
+
+    /// @notice Thrown when public inputs array has incorrect length
+    /// @param provided The length of the provided array
+    /// @param minimum The minimum required length
+    error InvalidPublicInputsLength(uint256 provided, uint256 minimum);
+
+    /// @notice Thrown when the identity commitment in proof doesn't match registered commitment
+    /// @param proofCommitment The identity commitment from the proof
+    /// @param registeredCommitment The registered identity commitment
+    error ProofIdentityMismatch(bytes32 proofCommitment, bytes32 registeredCommitment);
+
+    /// @notice Thrown when the server hash in proof doesn't match trusted server
+    /// @param proofServerHash The server hash from the proof
+    /// @param trustedHash The expected trusted server hash
+    error InvalidDataSource(bytes32 proofServerHash, bytes32 trustedHash);
+
+    /// @notice Thrown when ZK proof verification fails
+    error InvalidZKProof();
+
+    /// @notice Thrown when trying to claim but no heir is registered
+    error NoHeirRegistered();
+
+    /// @notice Thrown when caller is not the owner of the delegated account
+    error NotOwner();
+
+    /// @notice Thrown when caller is not the trusted off-chain verifier
+    error NotTrustedVerifier();
+
+    /*//////////////////////////////////////////////////////////////
                                 MODIFIERS
     //////////////////////////////////////////////////////////////*/
 
@@ -84,7 +121,7 @@ contract ProofHeir {
      *      This allows Bob to delegate to this implementation and Bob becomes the "owner" of his account.
      */
     modifier onlyOwner() {
-        require(msg.sender == address(this), "Only self can call");
+        if (msg.sender != address(this)) revert NotOwner();
         _;
     }
 
@@ -125,7 +162,7 @@ contract ProofHeir {
      */
     function registerIdentity(bytes32 _identityCommitment) external onlyOwner {
         ProofHeirStorage storage $ = _getProofHeirStorage();
-        require($.identityCommitment == bytes32(0), "Identity already registered");
+        if ($.identityCommitment != bytes32(0)) revert IdentityAlreadyRegistered();
         $.identityCommitment = _identityCommitment;
         emit IdentityRegistered(msg.sender, _identityCommitment);
     }
@@ -158,11 +195,11 @@ contract ProofHeir {
      */
     function proveDeathAndRegisterHeir(bytes calldata proof, bytes32[] calldata publicInputs) external {
         ProofHeirStorage storage $ = _getProofHeirStorage();
-        require($.identityCommitment != bytes32(0), "Identity not registered");
+        if ($.identityCommitment == bytes32(0)) revert IdentityNotRegistered();
         
         // Circuit serializes each byte as a 32-byte field element
         // Total: 20 (recipient) + 32 (server_hash) + 32 (id_commitment) + 32 (status_commitment) = 116 fields
-        require(publicInputs.length >= 116, "Invalid public inputs length");
+        if (publicInputs.length < 116) revert InvalidPublicInputsLength(publicInputs.length, 116);
         
 
         // --- 1. Security Check: Recipient Binding ---
@@ -172,15 +209,15 @@ contract ProofHeir {
         // --- 2. Security Check: Identity Binding ---
         // Prevents using a death certificate of a random person
         bytes32 proofIdCommitment = _extractBytes32(publicInputs, 52);
-        require(proofIdCommitment == $.identityCommitment, "Proof identity mismatch");
+        if (proofIdCommitment != $.identityCommitment) revert ProofIdentityMismatch(proofIdCommitment, $.identityCommitment);
 
         // --- 3. Security Check: Source Binding ---
         // Prevents using a fake server (Man-in-the-Middle with valid TLS but wrong host)
         bytes32 proofServerHash = _extractBytes32(publicInputs, 20);
-        require(proofServerHash == trustedServerHash, "Invalid data source (server domain)");
+        if (proofServerHash != trustedServerHash) revert InvalidDataSource(proofServerHash, trustedServerHash);
 
         // --- 4. Verify ZK Proof ---
-        require(verifier.verify(proof, publicInputs), "Invalid ZK proof");
+        if (!verifier.verify(proof, publicInputs)) revert InvalidZKProof();
 
         $.heir = proofHeir;
         emit HeirRegistered(msg.sender, proofHeir);
@@ -209,7 +246,7 @@ contract ProofHeir {
     function claimInheritance(address[] calldata tokens) external {
         ProofHeirStorage storage $ = _getProofHeirStorage();
         address heir = $.heir;
-        require(heir != address(0), "No heir registered");
+        if (heir == address(0)) revert NoHeirRegistered();
 
         for (uint256 i = 0; i < tokens.length; ++i) {
             uint256 balance = IERC20(tokens[i]).balanceOf(address(this));

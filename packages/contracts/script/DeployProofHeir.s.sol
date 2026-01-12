@@ -15,9 +15,9 @@ contract DeployProofHeir is Script {
 
         address targetWallet = 0xC7617F5aC47db5b237bCc7Eb1B2C3E1Da0Bac3f8;
         
-        // 1. Deploy Verifier (using Mock for now)
+        // 1. Deploy Verifier
         HonkVerifier verifier = new HonkVerifier();
-        console.log("MockVerifier deployed at:", address(verifier));
+        console.log("HonkVerifier deployed at:", address(verifier));
 
         // 2. Deploy ProofHeir
         // Read trusted server domain from environment and pad to 40 characters
