@@ -16,7 +16,7 @@ This package implements the core attestation logic for ProofHeir:
 │   Prover    │
 │             │
 │  1. MPC-TLS │──────► Connect to target server
-│             │        (e.g., civil-registry-mock.onrender.com)
+│             │        (e.g., web-production-05160.up.railway.app)
 │  2. Extract │──────► Parse authenticated response
 │     Data    │        (status, NUIP, etc.)
 │             │

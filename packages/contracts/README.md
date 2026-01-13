@@ -122,27 +122,43 @@ anvil
 
 2. **Deploy contracts:**
 ```bash
+CIVIL_REGISTRY_DOMAIN="web-production-05160.up.railway.app" \
 forge script script/DeployProofHeir.s.sol:DeployProofHeir \
   --rpc-url http://localhost:8545 \
   --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 \
   --broadcast
 ```
 
+> [!NOTE]
+> The `CIVIL_REGISTRY_DOMAIN` environment variable is required. It specifies the trusted server domain for death certificate verification.
+
 ### Testnet Deployment (Mantle Sepolia)
 
-1. **Set environment variables:**
+**Using the deploy script (recommended):**
+
 ```bash
-export PRIVATE_KEY=your_private_key_here
-export RPC_URL=https://rpc.sepolia.mantle.xyz
+# Set your private key
+export DEPLOYER_PRIVATE_KEY=0x...
+
+# Run the deployment script
+./script/deploy-mantle-sepolia.sh
 ```
 
-2. **Deploy:**
+> [!TIP]
+> Get testnet MNT for gas from the [Mantle Sepolia Faucet](https://faucet.sepolia.mantle.xyz/)
+
+**Manual deployment:**
+
 ```bash
+export DEPLOYER_PRIVATE_KEY=your_private_key_here
+export CIVIL_REGISTRY_DOMAIN="web-production-05160.up.railway.app"
+
 forge script script/DeployProofHeir.s.sol:DeployProofHeir \
-  --rpc-url $RPC_URL \
-  --private-key $PRIVATE_KEY \
+  --rpc-url https://rpc.sepolia.mantle.xyz \
+  --private-key $DEPLOYER_PRIVATE_KEY \
   --broadcast \
-  --verify
+  --legacy \
+  -vvv
 ```
 
 ### Mainnet Deployment (Mantle)

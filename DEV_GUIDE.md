@@ -18,8 +18,8 @@ cargo run --release
 
 **Terminal 2 - Next.js Frontend:**
 ```bash
-cd apps/web
-npm run dev
+# From project root
+pnpm dev:web
 ```
 
 ## 📡 Architecture
@@ -117,7 +117,8 @@ proofheir/
 - ✅ Next.js proxy endpoint
 - ✅ CORS configuration
 - ✅ Request validation
-- ⏳ Actual notary integration (TODO)
+- ✅ TLSNotary + Noir integration
+- ✅ On-chain ZK proof verification
 
 ## 🐛 Troubleshooting
 
