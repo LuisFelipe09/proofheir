@@ -1,9 +1,22 @@
 'use client'
 
+import { useState } from 'react'
 import { usePrivy } from '@privy-io/react-auth'
+import { Copy, Check } from 'lucide-react'
 
 export function WalletConnect() {
     const { ready, authenticated, user, login, logout } = usePrivy()
+    const [isCopied, setIsCopied] = useState(false)
+
+    const handleCopyAddress = async (address: string) => {
+        try {
+            await navigator.clipboard.writeText(address)
+            setIsCopied(true)
+            setTimeout(() => setIsCopied(false), 2000)
+        } catch (err) {
+            console.error('Failed to copy address:', err)
+        }
+    }
 
     if (!ready) {
         return (
@@ -28,8 +41,24 @@ export function WalletConnect() {
                     </div>
 
                     <div className="text-left">
-                        <div className="font-mono text-sm text-white font-medium">
-                            {address?.slice(0, 6)}...{address?.slice(-4)}
+                        <div className="flex items-center gap-1.5">
+                            <span className="font-mono text-sm text-white font-medium">
+                                {address?.slice(0, 6)}...{address?.slice(-4)}
+                            </span>
+                            {address && (
+                                <button
+                                    onClick={() => handleCopyAddress(address)}
+                                    aria-label={isCopied ? "Address copied" : "Copy address"}
+                                    title="Copy address"
+                                    className="p-0.5 rounded hover:bg-white/10 transition-colors"
+                                >
+                                    {isCopied ? (
+                                        <Check size={14} className="text-emerald-400" />
+                                    ) : (
+                                        <Copy size={14} className="text-slate-400 hover:text-white" />
+                                    )}
+                                </button>
+                            )}
                         </div>
                         <div className="text-xs text-slate-400">
                             {user.email?.address || 'Connected'}

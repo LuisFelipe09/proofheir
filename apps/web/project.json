@@ -39,7 +39,10 @@
         },
         "production": {
           "outputPath": "apps/web/.next",
-          "experimentalBuildMode": "compile"
+          "experimentalBuildMode": "compile",
+          "nextArgs": [
+            "--webpack"
+          ]
         }
       }
     },
