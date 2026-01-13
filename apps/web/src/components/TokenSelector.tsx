@@ -38,6 +38,15 @@ export function TokenSelector({
 
     const demoToken = tokens.find(t => t.isDemo)
     const otherTokens = tokens.filter(t => !t.isDemo && t.rawBalance > 0n)
+    const allSelectableTokens = tokens.filter(t => t.rawBalance > 0n || t.isDemo).map(t => t.address)
+
+    const selectAll = () => {
+        onTokensChange(allSelectableTokens)
+    }
+
+    const deselectAll = () => {
+        onTokensChange([])
+    }
 
     const formatBalance = (balance: string) => {
         const num = parseFloat(balance)
@@ -51,20 +60,35 @@ export function TokenSelector({
     return (
         <div className="space-y-4">
             {/* Header */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
                 <h4 className="text-sm font-semibold text-slate-300">
                     {mode === 'delegation' ? 'Select Assets to Include' : 'Tokens to Claim'}
                 </h4>
-                <button
-                    onClick={refetch}
-                    disabled={isLoading}
-                    className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1 disabled:opacity-50"
-                >
-                    <svg className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                    </svg>
-                    Refresh
-                </button>
+                <div className="flex items-center gap-2">
+                    {allSelectableTokens.length > 0 && (
+                        <>
+                            <button
+                                onClick={selectedTokens.length === allSelectableTokens.length ? deselectAll : selectAll}
+                                aria-label={selectedTokens.length === allSelectableTokens.length ? "Deselect all tokens" : "Select all tokens"}
+                                className="text-xs text-slate-400 hover:text-white transition-colors"
+                            >
+                                {selectedTokens.length === allSelectableTokens.length ? 'Clear' : 'Select All'}
+                            </button>
+                            <span className="text-slate-600">•</span>
+                        </>
+                    )}
+                    <button
+                        onClick={refetch}
+                        disabled={isLoading}
+                        aria-label="Refresh token balances"
+                        className="text-xs text-cyan-400 hover:text-cyan-300 flex items-center gap-1 disabled:opacity-50"
+                    >
+                        <svg className={`w-3 h-3 ${isLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Refresh
+                    </button>
+                </div>
             </div>
 
             {/* Demo Token - Always visible and prominent */}
@@ -77,6 +101,7 @@ export function TokenSelector({
                         </div>
                         <button
                             onClick={refetch}
+                            aria-label="Refresh demo token balance"
                             className="text-xs text-slate-400 hover:text-white"
                         >
                             ↻
@@ -94,17 +119,18 @@ export function TokenSelector({
                             </div>
                             <button
                                 onClick={() => toggleToken(demoToken.address)}
-                                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${selectedTokens.includes(demoToken.address)
+                                aria-label={selectedTokens.includes(demoToken.address) ? `Deselect ${demoToken.symbol}` : `Select ${demoToken.symbol}`}
+                                className={`w-11 h-11 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition-all ${selectedTokens.includes(demoToken.address)
                                     ? 'bg-emerald-500 text-white'
                                     : 'bg-slate-700/50 text-slate-400 hover:bg-slate-600/50'
                                     }`}
                             >
                                 {selectedTokens.includes(demoToken.address) ? (
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                     </svg>
                                 ) : (
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                                     </svg>
                                 )}
@@ -113,14 +139,14 @@ export function TokenSelector({
                     </div>
                     {demoToken.balance === '-' ? (
                         <p className="text-xs text-blue-400 mt-2 flex items-center gap-1">
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             Enter testator address to see balance
                         </p>
                     ) : parseFloat(demoToken.balance) === 0 && (
                         <p className="text-xs text-amber-400 mt-2 flex items-center gap-1">
-                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             {mode === 'delegation' ? 'Use the Faucet (💰) to get demo tokens' : 'No tokens available to claim'}
@@ -133,7 +159,7 @@ export function TokenSelector({
             {otherTokens.length > 0 && (
                 <div className="bg-slate-700/30 rounded-xl p-4">
                     <div className="flex items-center gap-2 mb-3">
-                        <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
                         <span className="text-xs text-slate-400">Detected in Your Wallet</span>
@@ -166,13 +192,14 @@ export function TokenSelector({
             {/* Custom Token Input */}
             <div className="bg-slate-700/30 rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-3">
-                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                     </svg>
-                    <span className="text-xs text-slate-400">Add Custom Token</span>
+                    <label htmlFor="custom-token-input" className="text-xs text-slate-400">Add Custom Token</label>
                 </div>
                 <div className="flex gap-2">
                     <input
+                        id="custom-token-input"
                         type="text"
                         value={customAddress}
                         onChange={(e) => setCustomAddress(e.target.value)}
@@ -182,6 +209,7 @@ export function TokenSelector({
                     <button
                         onClick={addCustomToken}
                         disabled={!customAddress || !customAddress.startsWith('0x') || customAddress.length !== 42}
+                        aria-label="Add custom token"
                         className="px-4 bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-600 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
                     >
                         Add
@@ -207,6 +235,7 @@ export function TokenSelector({
                                     {token?.symbol || addr.slice(0, 6) + '...'}
                                     <button
                                         onClick={() => toggleToken(addr)}
+                                        aria-label={`Remove ${token?.symbol || 'token'}`}
                                         className="hover:text-white"
                                     >
                                         ×
@@ -237,7 +266,10 @@ function TokenRow({
         <div className="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg border border-white/5 hover:border-white/10 transition-colors">
             <div className="flex-1 min-w-0">
                 <p className="font-medium text-white text-sm truncate">{token.symbol}</p>
-                <p className="text-xs text-slate-500 font-mono truncate">{token.address.slice(0, 8)}...{token.address.slice(-4)}</p>
+                <p className="text-xs text-slate-500 font-mono truncate">
+                    <span className="sm:hidden">{token.address.slice(0, 6)}...{token.address.slice(-4)}</span>
+                    <span className="hidden sm:inline">{token.address.slice(0, 8)}...{token.address.slice(-4)}</span>
+                </p>
             </div>
             <div className="flex items-center gap-2">
                 <div className="text-right">
@@ -245,17 +277,18 @@ function TokenRow({
                 </div>
                 <button
                     onClick={onToggle}
-                    className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all ${isSelected
+                    aria-label={isSelected ? `Deselect ${token.symbol}` : `Select ${token.symbol}`}
+                    className={`w-11 h-11 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center transition-all ${isSelected
                         ? 'bg-cyan-500 text-white'
                         : 'bg-slate-700/50 text-slate-400 hover:bg-slate-600/50'
                         }`}
                 >
                     {isSelected ? (
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
                     ) : (
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                         </svg>
                     )}
