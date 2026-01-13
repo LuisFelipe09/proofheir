@@ -18,6 +18,7 @@ export function TokenSelector({
 }: TokenSelectorProps) {
     const { tokens, isLoading, refetch } = useTokenBalances(userAddress)
     const [customAddress, setCustomAddress] = useState('')
+    const [searchQuery, setSearchQuery] = useState('')
 
     const toggleToken = (address: string) => {
         if (selectedTokens.includes(address)) {
@@ -36,8 +37,16 @@ export function TokenSelector({
         }
     }
 
+    // Filter tokens by search query
+    const filterToken = (token: TokenInfo) => {
+        if (!searchQuery) return true
+        const query = searchQuery.toLowerCase()
+        return token.symbol.toLowerCase().includes(query) ||
+            token.address.toLowerCase().includes(query)
+    }
+
     const demoToken = tokens.find(t => t.isDemo)
-    const otherTokens = tokens.filter(t => !t.isDemo && t.rawBalance > 0n)
+    const otherTokens = tokens.filter(t => !t.isDemo && t.rawBalance > 0n).filter(filterToken)
     const allSelectableTokens = tokens.filter(t => t.rawBalance > 0n || t.isDemo).map(t => t.address)
 
     const selectAll = () => {
@@ -156,24 +165,56 @@ export function TokenSelector({
             )}
 
             {/* Other Tokens from Wallet */}
-            {otherTokens.length > 0 && (
+            {tokens.filter(t => !t.isDemo && t.rawBalance > 0n).length > 0 && (
                 <div className="bg-slate-700/30 rounded-xl p-4">
-                    <div className="flex items-center gap-2 mb-3">
-                        <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                        <div className="flex items-center gap-2">
+                            <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                            </svg>
+                            <span className="text-xs text-slate-400">Detected in Your Wallet</span>
+                        </div>
+                    </div>
+
+                    {/* Search Input */}
+                    <div className="relative mb-3">
+                        <input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder="Search tokens..."
+                            aria-label="Search tokens by symbol or address"
+                            className="w-full p-2.5 pl-9 bg-slate-800/50 border border-white/10 rounded-lg text-white placeholder-slate-500 text-xs focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                        />
+                        <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                         </svg>
-                        <span className="text-xs text-slate-400">Detected in Your Wallet</span>
+                        {searchQuery && (
+                            <button
+                                onClick={() => setSearchQuery('')}
+                                aria-label="Clear search"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                            >
+                                ×
+                            </button>
+                        )}
                     </div>
                     <div className="space-y-2">
-                        {otherTokens.map((token) => (
-                            <TokenRow
-                                key={token.address}
-                                token={token}
-                                isSelected={selectedTokens.includes(token.address)}
-                                onToggle={() => toggleToken(token.address)}
-                                formatBalance={formatBalance}
-                            />
-                        ))}
+                        {otherTokens.length > 0 ? (
+                            otherTokens.map((token) => (
+                                <TokenRow
+                                    key={token.address}
+                                    token={token}
+                                    isSelected={selectedTokens.includes(token.address)}
+                                    onToggle={() => toggleToken(token.address)}
+                                    formatBalance={formatBalance}
+                                />
+                            ))
+                        ) : searchQuery ? (
+                            <p className="text-center text-slate-500 text-xs py-3">
+                                No tokens match "{searchQuery}"
+                            </p>
+                        ) : null}
                     </div>
                 </div>
             )}
@@ -204,7 +245,10 @@ export function TokenSelector({
                         value={customAddress}
                         onChange={(e) => setCustomAddress(e.target.value)}
                         placeholder="0x... token address"
-                        className="flex-1 p-2.5 bg-slate-800/50 border border-white/10 rounded-lg text-white placeholder-slate-500 font-mono text-xs focus:ring-2 focus:ring-cyan-500 focus:border-transparent"
+                        className={`flex-1 p-2.5 bg-slate-800/50 border rounded-lg text-white placeholder-slate-500 font-mono text-xs focus:ring-2 focus:ring-cyan-500 focus:border-transparent ${customAddress && (!customAddress.startsWith('0x') || customAddress.length !== 42)
+                                ? 'border-rose-500/50'
+                                : 'border-white/10'
+                            }`}
                     />
                     <button
                         onClick={addCustomToken}
@@ -215,6 +259,13 @@ export function TokenSelector({
                         Add
                     </button>
                 </div>
+                {customAddress && (!customAddress.startsWith('0x') || customAddress.length !== 42) && (
+                    <p className="text-xs text-rose-400 mt-2">
+                        {!customAddress.startsWith('0x')
+                            ? 'Address must start with 0x'
+                            : `Address must be 42 characters (${customAddress.length}/42)`}
+                    </p>
+                )}
             </div>
 
             {/* Selected Tokens Summary */}
