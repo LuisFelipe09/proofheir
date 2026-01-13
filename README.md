@@ -32,6 +32,13 @@ Traditional crypto inheritance relies on sharing private keys (insecure) or cent
 | **Authentication** | [Privy](https://www.privy.io/) |
 | **Monorepo** | [Nx](https://nx.dev/) + pnpm |
 
+> [!IMPORTANT]
+> **Why Privy for EIP-7702?**
+> 
+> EIP-7702 introduces a new transaction type for EOA delegation that requires wallets to support `authorization` signing via JSON-RPC. Currently, **very few wallets support this**. [Privy](https://www.privy.io/) is one of the early adopters that fully supports EIP-7702 authorization signing.
+> 
+> As EIP-7702 adoption grows across the ecosystem, ProofHeir's architecture is designed to easily integrate with any wallet that implements the standard—allowing users to use their preferred wallet in the future.
+
 ---
 
 ## 🏗 Project Structure
