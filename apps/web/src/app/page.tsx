@@ -20,41 +20,83 @@ export default function Page() {
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white font-sans">
       {/* Header */}
-      <header className="w-full border-b border-white/10 backdrop-blur-sm bg-slate-900/50 sticky top-0 z-50">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex justify-between items-center gap-2">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => setSelectedRole('none')}>
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25">
-              <span className="text-white font-bold text-lg">P</span>
+      <header className="w-full border-b border-white/10 backdrop-blur-sm bg-slate-900/80 sticky top-0 z-50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
+          <div className="flex items-center justify-between">
+            {/* Logo + Brand */}
+            <div className="flex items-center gap-2 sm:gap-3 cursor-pointer flex-shrink-0" onClick={() => setSelectedRole('none')}>
+              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25">
+                <span className="text-white font-bold text-base sm:text-lg">P</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-lg sm:text-xl tracking-tight">ProofHeir</span>
+                <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full hidden sm:inline">Beta</span>
+              </div>
             </div>
-            <div>
-              <span className="font-bold text-lg sm:text-xl tracking-tight">ProofHeir</span>
-              <span className="hidden sm:inline ml-2 text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full">Beta</span>
-              <span className={`hidden sm:inline ml-2 text-xs px-2 py-0.5 rounded-full ${activeChain.id === 31337
+
+            {/* Navigation - Desktop (centered absolutely) */}
+            {showLanding && (
+              <nav className="hidden lg:flex items-center gap-8 text-sm text-slate-400 absolute left-1/2 -translate-x-1/2">
+                <a href="#how-it-works" className="hover:text-white transition-colors">How It Works</a>
+                <a href="#features" className="hover:text-white transition-colors">Features</a>
+                <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
+              </nav>
+            )}
+
+            {/* Right Section */}
+            <div className="flex items-center gap-2 sm:gap-3">
+              {/* Network Badge - Compact on mobile */}
+              <span className={`text-xs px-2 py-1 rounded-full whitespace-nowrap ${activeChain.id === 31337
                 ? 'bg-amber-500/20 text-amber-300'
                 : activeChain.id === 5003
                   ? 'bg-purple-500/20 text-purple-300'
                   : 'bg-emerald-500/20 text-emerald-300'
                 }`}>
-                {activeChain.name}
+                <span className="hidden sm:inline">{activeChain.name}</span>
+                <span className="sm:hidden">{activeChain.id === 31337 ? 'Local' : activeChain.id === 5003 ? 'Mantle' : 'Net'}</span>
               </span>
+
+              {/* Dev Faucet - Hidden on mobile */}
+              <div className="hidden md:block">
+                <DevFaucet />
+              </div>
+
+              {/* Wallet Connect */}
+              <WalletConnect />
+
+              {/* Mobile Menu Button */}
+              {showLanding && (
+                <button
+                  className="lg:hidden p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                  onClick={() => {
+                    const mobileMenu = document.getElementById('mobile-menu');
+                    if (mobileMenu) {
+                      mobileMenu.classList.toggle('hidden');
+                    }
+                  }}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  </svg>
+                </button>
+              )}
             </div>
           </div>
 
-          {/* Navigation Links - Desktop only */}
+          {/* Mobile Navigation Menu */}
           {showLanding && (
-            <nav className="hidden md:flex items-center gap-6 text-sm text-slate-400">
-              <a href="#how-it-works" className="hover:text-white transition-colors">How It Works</a>
-              <a href="#features" className="hover:text-white transition-colors">Features</a>
-              <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
+            <nav id="mobile-menu" className="hidden lg:hidden mt-4 pt-4 border-t border-white/10">
+              <div className="flex flex-col gap-3 text-sm text-slate-400">
+                <a href="#how-it-works" className="hover:text-white transition-colors py-2">How It Works</a>
+                <a href="#features" className="hover:text-white transition-colors py-2">Features</a>
+                <a href="#pricing" className="hover:text-white transition-colors py-2">Pricing</a>
+                {/* Show DevFaucet on mobile menu */}
+                <div className="md:hidden py-2">
+                  <DevFaucet />
+                </div>
+              </div>
             </nav>
           )}
-
-          <div className="flex items-center gap-2 sm:gap-3">
-            <div className="hidden sm:block">
-              <DevFaucet />
-            </div>
-            <WalletConnect />
-          </div>
         </div>
       </header>
 
