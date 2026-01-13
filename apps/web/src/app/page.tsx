@@ -14,8 +14,10 @@ export default function Page() {
   const { authenticated } = usePrivy()
   const [selectedRole, setSelectedRole] = useState<UserRole>('none')
 
-  // If not authenticated or no role selected, show landing
-  const showLanding = !authenticated || selectedRole === 'none'
+  // Separate states: landing (not authenticated), role selection (authenticated but no role), and app (authenticated + role)
+  const showLanding = !authenticated
+  const showRoleSelection = authenticated && selectedRole === 'none'
+  const showApp = authenticated && selectedRole !== 'none'
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white font-sans">
@@ -34,7 +36,7 @@ export default function Page() {
               </div>
             </div>
 
-            {/* Navigation - Desktop (flex-1 to take available space) */}
+            {/* Navigation - Desktop (only on landing page) */}
             {showLanding && (
               <nav className="hidden lg:flex items-center justify-center gap-8 text-sm text-slate-400 flex-1">
                 <a href="#how-it-works" className="hover:text-white transition-colors whitespace-nowrap">How It Works</a>
@@ -63,7 +65,7 @@ export default function Page() {
               {/* Wallet Connect */}
               <WalletConnect />
 
-              {/* Mobile Menu Button */}
+              {/* Mobile Menu Button - only on landing */}
               {showLanding && (
                 <button
                   className="lg:hidden p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors flex-shrink-0"
@@ -82,7 +84,7 @@ export default function Page() {
             </div>
           </div>
 
-          {/* Mobile Navigation Menu */}
+          {/* Mobile Navigation Menu - only on landing */}
           {showLanding && (
             <nav id="mobile-menu" className="hidden lg:hidden mt-4 pt-4 border-t border-white/10">
               <div className="flex flex-col gap-3 text-sm text-slate-400">
@@ -142,53 +144,6 @@ export default function Page() {
                     </div>
                   </div>
                 </div>
-              </div>
-
-              {/* Role Selection Cards */}
-              <div className="grid md:grid-cols-2 gap-6 max-w-3xl mx-auto mb-16">
-                {/* Leave Inheritance Card */}
-                <button
-                  onClick={() => setSelectedRole('testator')}
-                  className="group p-6 sm:p-8 bg-slate-800/50 hover:bg-slate-800/80 border border-white/10 hover:border-blue-500/50 rounded-2xl text-left transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/10"
-                >
-                  <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-blue-500/25">
-                    <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-bold text-white mb-2">Leave an Inheritance</h3>
-                  <p className="text-slate-400 text-sm mb-4">
-                    Protect your digital assets and designate an heir who can claim them securely.
-                  </p>
-                  <span className="inline-flex items-center gap-2 text-blue-400 text-sm font-medium group-hover:gap-3 transition-all">
-                    Create My Plan
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                    </svg>
-                  </span>
-                </button>
-
-                {/* Claim Inheritance Card */}
-                <button
-                  onClick={() => setSelectedRole('heir')}
-                  className="group p-6 sm:p-8 bg-slate-800/50 hover:bg-slate-800/80 border border-white/10 hover:border-indigo-500/50 rounded-2xl text-left transition-all duration-300 hover:shadow-xl hover:shadow-indigo-500/10"
-                >
-                  <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-indigo-500/25">
-                    <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <h3 className="text-xl font-bold text-white mb-2">Claim an Inheritance</h3>
-                  <p className="text-slate-400 text-sm mb-4">
-                    Receive the assets a loved one secured for your future.
-                  </p>
-                  <span className="inline-flex items-center gap-2 text-indigo-400 text-sm font-medium group-hover:gap-3 transition-all">
-                    Claim Now
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
-                    </svg>
-                  </span>
-                </button>
               </div>
 
               {/* How It Works */}
@@ -423,6 +378,96 @@ export default function Page() {
                 <p className="text-center text-sm text-slate-500 mt-8">
                   💡 Traditional notary fees range from 3% to 5% of estate value. ProofHeir saves you up to 85% on inheritance costs.
                 </p>
+              </div>
+            </div>
+          </div>
+        ) : showRoleSelection ? (
+          // ROLE SELECTION SCREEN - Clean, focused interface after wallet connection
+          <div className="flex-1 flex items-center justify-center px-6 py-12">
+            <div className="max-w-2xl w-full">
+              {/* Welcome Message */}
+              <div className="text-center mb-10">
+                <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full mb-6">
+                  <span className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse"></span>
+                  <span className="text-sm text-emerald-300">Wallet Connected Successfully</span>
+                </div>
+                <h1 className="text-3xl sm:text-4xl font-bold text-white mb-3">
+                  What would you like to do?
+                </h1>
+                <p className="text-slate-400 text-lg">
+                  Choose an option to get started
+                </p>
+              </div>
+
+              {/* Role Selection Cards */}
+              <div className="grid sm:grid-cols-2 gap-6">
+                {/* Leave Inheritance Card */}
+                <button
+                  onClick={() => setSelectedRole('testator')}
+                  className="group p-6 sm:p-8 bg-slate-800/50 hover:bg-slate-800/80 border border-white/10 hover:border-blue-500/50 rounded-2xl text-left transition-all duration-300 hover:shadow-xl hover:shadow-blue-500/10 hover:scale-[1.02]"
+                >
+                  <div className="w-14 h-14 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-blue-500/25">
+                    <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-2">Create Inheritance Plan</h3>
+                  <p className="text-slate-400 text-sm mb-4">
+                    Protect your digital assets and designate an heir who can claim them securely.
+                  </p>
+                  <span className="inline-flex items-center gap-2 text-blue-400 text-sm font-medium group-hover:gap-3 transition-all">
+                    Get Started
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                    </svg>
+                  </span>
+                </button>
+
+                {/* Claim Inheritance Card */}
+                <button
+                  onClick={() => setSelectedRole('heir')}
+                  className="group p-6 sm:p-8 bg-slate-800/50 hover:bg-slate-800/80 border border-white/10 hover:border-indigo-500/50 rounded-2xl text-left transition-all duration-300 hover:shadow-xl hover:shadow-indigo-500/10 hover:scale-[1.02]"
+                >
+                  <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mb-6 group-hover:scale-110 transition-transform shadow-lg shadow-indigo-500/25">
+                    <svg className="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold text-white mb-2">Claim Inheritance</h3>
+                  <p className="text-slate-400 text-sm mb-4">
+                    Receive the assets a loved one secured for your future.
+                  </p>
+                  <span className="inline-flex items-center gap-2 text-indigo-400 text-sm font-medium group-hover:gap-3 transition-all">
+                    Start Claim Process
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                    </svg>
+                  </span>
+                </button>
+              </div>
+
+              {/* Trust signals */}
+              <div className="mt-10 pt-6 border-t border-white/10">
+                <div className="flex flex-wrap justify-center gap-4 sm:gap-6 text-xs sm:text-sm text-slate-500">
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+                    </svg>
+                    <span>Non-custodial</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
+                    </svg>
+                    <span>ZK Privacy</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <svg className="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    <span>EIP-7702</span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
