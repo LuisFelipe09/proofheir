@@ -586,37 +586,48 @@ export function DelegationCard() {
     )
 }
 
-// Step Indicator Component
+// Step Indicator Component - Mobile Optimized
 function StepIndicator({ steps, currentStep }: { steps: { id: string; title: string }[]; currentStep: number }) {
+    // Short labels for mobile
+    const mobileLabels: Record<string, string> = {
+        'Welcome': 'Start',
+        'Select Assets': 'Assets',
+        'Activate Plan': 'Activate',
+        'Register Identity': 'Register'
+    }
+
     return (
-        <div className="mb-8">
-            <div className="flex items-center justify-between relative">
-                <div className="absolute top-5 left-0 right-0 h-0.5 bg-slate-700" />
+        <div className="mb-6 sm:mb-8">
+            <div className="flex items-start justify-between relative px-2 sm:px-0">
+                {/* Progress line background */}
+                <div className="absolute top-4 sm:top-5 left-6 right-6 sm:left-5 sm:right-5 h-0.5 bg-slate-700" />
+                {/* Progress line fill */}
                 <div
-                    className="absolute top-5 left-0 h-0.5 bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-500"
-                    style={{ width: `${(currentStep / (steps.length - 1)) * 100}%` }}
+                    className="absolute top-4 sm:top-5 left-6 sm:left-5 h-0.5 bg-gradient-to-r from-cyan-500 to-blue-500 transition-all duration-500"
+                    style={{ width: `calc(${(currentStep / (steps.length - 1)) * 100}% - 24px)` }}
                 />
                 {steps.map((step, index) => (
-                    <div key={step.id} className="relative flex flex-col items-center z-10">
+                    <div key={step.id} className="relative flex flex-col items-center z-10 flex-1">
                         <div
-                            className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 ${index < currentStep
+                            className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center font-bold text-xs sm:text-sm transition-all duration-300 ${index < currentStep
                                 ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-lg shadow-emerald-500/30'
                                 : index === currentStep
-                                    ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-500/30 ring-4 ring-cyan-500/20'
+                                    ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-lg shadow-cyan-500/30 ring-2 sm:ring-4 ring-cyan-500/20'
                                     : 'bg-slate-700 text-slate-400'
                                 }`}
                         >
                             {index < currentStep ? (
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                 </svg>
                             ) : (
                                 index + 1
                             )}
                         </div>
-                        <span className={`mt-2 text-xs font-medium ${index <= currentStep ? 'text-white' : 'text-slate-500'
+                        <span className={`mt-1.5 sm:mt-2 text-[10px] sm:text-xs font-medium text-center leading-tight max-w-[60px] sm:max-w-none ${index <= currentStep ? 'text-white' : 'text-slate-500'
                             }`}>
-                            {step.title}
+                            <span className="sm:hidden">{mobileLabels[step.title] || step.title}</span>
+                            <span className="hidden sm:inline">{step.title}</span>
                         </span>
                     </div>
                 ))}
