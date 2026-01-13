@@ -129,13 +129,13 @@ export function TokenSelector({
                             <button
                                 onClick={() => toggleToken(demoToken.address)}
                                 aria-label={selectedTokens.includes(demoToken.address) ? `Deselect ${demoToken.symbol}` : `Select ${demoToken.symbol}`}
-                                className={`w-11 h-11 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition-all ${selectedTokens.includes(demoToken.address)
-                                    ? 'bg-emerald-500 text-white'
+                                className={`w-11 h-11 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center transition-all duration-200 transform active:scale-90 hover:scale-105 ${selectedTokens.includes(demoToken.address)
+                                    ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/40'
                                     : 'bg-slate-700/50 text-slate-400 hover:bg-slate-600/50'
                                     }`}
                             >
                                 {selectedTokens.includes(demoToken.address) ? (
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <svg className="w-4 h-4 animate-[scaleIn_0.2s_ease-out]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                                     </svg>
                                 ) : (
@@ -246,8 +246,8 @@ export function TokenSelector({
                         onChange={(e) => setCustomAddress(e.target.value)}
                         placeholder="0x... token address"
                         className={`flex-1 p-2.5 bg-slate-800/50 border rounded-lg text-white placeholder-slate-500 font-mono text-xs focus:ring-2 focus:ring-cyan-500 focus:border-transparent ${customAddress && (!customAddress.startsWith('0x') || customAddress.length !== 42)
-                                ? 'border-rose-500/50'
-                                : 'border-white/10'
+                            ? 'border-rose-500/50'
+                            : 'border-white/10'
                             }`}
                     />
                     <button
@@ -314,7 +314,10 @@ function TokenRow({
     formatBalance: (balance: string) => string
 }) {
     return (
-        <div className="flex items-center justify-between p-2 bg-slate-800/50 rounded-lg border border-white/5 hover:border-white/10 transition-colors">
+        <div className={`flex items-center justify-between p-2 rounded-lg border transition-all duration-200 ${isSelected
+            ? 'bg-cyan-500/10 border-cyan-500/30'
+            : 'bg-slate-800/50 border-white/5 hover:border-white/10'
+            }`}>
             <div className="flex-1 min-w-0">
                 <p className="font-medium text-white text-sm truncate">{token.symbol}</p>
                 <p className="text-xs text-slate-500 font-mono truncate">
@@ -329,13 +332,13 @@ function TokenRow({
                 <button
                     onClick={onToggle}
                     aria-label={isSelected ? `Deselect ${token.symbol}` : `Select ${token.symbol}`}
-                    className={`w-11 h-11 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center transition-all ${isSelected
-                        ? 'bg-cyan-500 text-white'
+                    className={`w-11 h-11 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center transition-all duration-200 transform active:scale-90 hover:scale-105 ${isSelected
+                        ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/40'
                         : 'bg-slate-700/50 text-slate-400 hover:bg-slate-600/50'
                         }`}
                 >
                     {isSelected ? (
-                        <svg className="w-4 h-4 sm:w-3.5 sm:h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <svg className="w-4 h-4 sm:w-3.5 sm:h-3.5 animate-[scaleIn_0.2s_ease-out]" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                         </svg>
                     ) : (
