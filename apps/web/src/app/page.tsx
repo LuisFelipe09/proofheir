@@ -22,38 +22,37 @@ export default function Page() {
       {/* Header */}
       <header className="w-full border-b border-white/10 backdrop-blur-sm bg-slate-900/80 sticky top-0 z-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             {/* Logo + Brand */}
             <div className="flex items-center gap-2 sm:gap-3 cursor-pointer flex-shrink-0" onClick={() => setSelectedRole('none')}>
-              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/25 flex-shrink-0">
                 <span className="text-white font-bold text-base sm:text-lg">P</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="font-bold text-lg sm:text-xl tracking-tight">ProofHeir</span>
-                <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full hidden sm:inline">Beta</span>
+                <span className="font-bold text-lg sm:text-xl tracking-tight hidden sm:inline">ProofHeir</span>
+                <span className="text-xs bg-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full hidden md:inline">Beta</span>
               </div>
             </div>
 
-            {/* Navigation - Desktop (centered absolutely) */}
+            {/* Navigation - Desktop (flex-1 to take available space) */}
             {showLanding && (
-              <nav className="hidden lg:flex items-center gap-8 text-sm text-slate-400 absolute left-1/2 -translate-x-1/2">
-                <a href="#how-it-works" className="hover:text-white transition-colors">How It Works</a>
-                <a href="#features" className="hover:text-white transition-colors">Features</a>
-                <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
+              <nav className="hidden lg:flex items-center justify-center gap-8 text-sm text-slate-400 flex-1">
+                <a href="#how-it-works" className="hover:text-white transition-colors whitespace-nowrap">How It Works</a>
+                <a href="#features" className="hover:text-white transition-colors whitespace-nowrap">Features</a>
+                <a href="#pricing" className="hover:text-white transition-colors whitespace-nowrap">Pricing</a>
               </nav>
             )}
 
             {/* Right Section */}
-            <div className="flex items-center gap-2 sm:gap-3">
-              {/* Network Badge - Compact on mobile */}
-              <span className={`text-xs px-2 py-1 rounded-full whitespace-nowrap ${activeChain.id === 31337
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+              {/* Network Badge - Hidden on very small screens */}
+              <span className={`hidden min-[400px]:inline-block text-xs px-2 py-1 rounded-full whitespace-nowrap max-w-[80px] sm:max-w-[120px] truncate ${activeChain.id === 31337
                 ? 'bg-amber-500/20 text-amber-300'
                 : activeChain.id === 5003
                   ? 'bg-purple-500/20 text-purple-300'
                   : 'bg-emerald-500/20 text-emerald-300'
-                }`}>
-                <span className="hidden sm:inline">{activeChain.name}</span>
-                <span className="sm:hidden">{activeChain.id === 31337 ? 'Local' : activeChain.id === 5003 ? 'Mantle' : 'Net'}</span>
+                }`} title={activeChain.name}>
+                {activeChain.id === 31337 ? 'Local' : activeChain.name.split(' ')[0]}
               </span>
 
               {/* Dev Faucet - Hidden on mobile */}
@@ -67,7 +66,7 @@ export default function Page() {
               {/* Mobile Menu Button */}
               {showLanding && (
                 <button
-                  className="lg:hidden p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                  className="lg:hidden p-2 text-slate-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors flex-shrink-0"
                   onClick={() => {
                     const mobileMenu = document.getElementById('mobile-menu');
                     if (mobileMenu) {
