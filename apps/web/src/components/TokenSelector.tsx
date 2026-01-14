@@ -193,9 +193,11 @@ export function TokenSelector({
                             <button
                                 onClick={() => setSearchQuery('')}
                                 aria-label="Clear search"
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-white hover:bg-slate-700/50 rounded-full p-1 transition-colors"
                             >
-                                ×
+                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
                             </button>
                         )}
                     </div>
@@ -245,6 +247,8 @@ export function TokenSelector({
                         value={customAddress}
                         onChange={(e) => setCustomAddress(e.target.value)}
                         placeholder="0x... token address"
+                        aria-invalid={!!customAddress && (!customAddress.startsWith('0x') || customAddress.length !== 42)}
+                        aria-describedby="custom-token-error"
                         className={`flex-1 p-2.5 bg-slate-800/50 border rounded-lg text-white placeholder-slate-500 font-mono text-xs focus:ring-2 focus:ring-cyan-500 focus:border-transparent ${customAddress && (!customAddress.startsWith('0x') || customAddress.length !== 42)
                             ? 'border-rose-500/50'
                             : 'border-white/10'
@@ -260,7 +264,7 @@ export function TokenSelector({
                     </button>
                 </div>
                 {customAddress && (!customAddress.startsWith('0x') || customAddress.length !== 42) && (
-                    <p className="text-xs text-rose-400 mt-2">
+                    <p id="custom-token-error" role="alert" className="text-xs text-rose-400 mt-2">
                         {!customAddress.startsWith('0x')
                             ? 'Address must start with 0x'
                             : `Address must be 42 characters (${customAddress.length}/42)`}
@@ -314,10 +318,22 @@ function TokenRow({
     formatBalance: (balance: string) => string
 }) {
     return (
-        <div className={`flex items-center justify-between p-2 rounded-lg border transition-all duration-200 ${isSelected
+        <div
+            onClick={onToggle}
+            role="checkbox"
+            aria-checked={isSelected}
+            tabIndex={0}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onToggle();
+                }
+            }}
+            className={`flex items-center justify-between p-2 rounded-lg border transition-all duration-200 cursor-pointer ${isSelected
             ? 'bg-cyan-500/10 border-cyan-500/30'
             : 'bg-slate-800/50 border-white/5 hover:border-white/10'
-            }`}>
+            }`}
+        >
             <div className="flex-1 min-w-0">
                 <p className="font-medium text-white text-sm truncate">{token.symbol}</p>
                 <p className="text-xs text-slate-500 font-mono truncate">
@@ -329,9 +345,7 @@ function TokenRow({
                 <div className="text-right">
                     <p className="text-sm font-medium text-white">{formatBalance(token.balance)}</p>
                 </div>
-                <button
-                    onClick={onToggle}
-                    aria-label={isSelected ? `Deselect ${token.symbol}` : `Select ${token.symbol}`}
+                <div
                     className={`w-11 h-11 sm:w-7 sm:h-7 rounded-lg flex items-center justify-center transition-all duration-200 transform active:scale-90 hover:scale-105 ${isSelected
                         ? 'bg-cyan-500 text-white shadow-lg shadow-cyan-500/40'
                         : 'bg-slate-700/50 text-slate-400 hover:bg-slate-600/50'
@@ -346,7 +360,7 @@ function TokenRow({
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                         </svg>
                     )}
-                </button>
+                </div>
             </div>
         </div>
     )
