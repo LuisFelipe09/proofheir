@@ -162,8 +162,8 @@ export default function Page() {
                   </div>
                   <div className="text-center">
                     <div className="w-12 h-12 bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-4 text-white font-bold">3</div>
-                    <h3 className="font-semibold text-white mb-2">Secure Transfer</h3>
-                    <p className="text-sm text-slate-400">When the time comes, your heir can claim assets by verifying their identity.</p>
+                    <h3 className="font-semibold text-white mb-2">Verification & Transfer</h3>
+                    <p className="text-sm text-slate-400">When recovery is triggered, your heir proves the life event using official government records. TLSNotary verifies this privately, and Noir ZK-Proofs execute the transfer on Mantle—no human intervention.</p>
                   </div>
                 </div>
               </div>
@@ -192,28 +192,20 @@ export default function Page() {
               <div className="mt-16 pt-8 border-t border-white/10">
                 <div className="flex flex-wrap justify-center gap-6 text-sm text-slate-500">
                   <div className="flex items-center gap-2">
-                    <svg className="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                    </svg>
-                    <span>Non-custodial</span>
+                    <span className="text-lg">🔑</span>
+                    <span>You Keep Your Keys</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0 3.517-1.009 6.799-2.753 9.571m-3.44-2.04l.054-.09A13.916 13.916 0 008 11a4 4 0 118 0c0 1.017-.07 2.019-.203 3m-2.118 6.844A21.88 21.88 0 0015.171 17m3.839 1.132c.645-2.266.99-4.659.99-7.132A8 8 0 008 4.07M3 15.364c.64-1.319 1-2.8 1-4.364 0-1.457.39-2.823 1.07-4" />
-                    </svg>
-                    <span>Zero-Knowledge Privacy</span>
+                    <span className="text-lg">🕵️</span>
+                    <span>100% Private Verification</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <svg className="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                    </svg>
-                    <span>EIP-7702 Powered</span>
+                    <span className="text-lg">🛡️</span>
+                    <span>Secure Delegation Technology</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                    </svg>
-                    <span>TLSNotary Verified</span>
+                    <span className="text-lg">🌐</span>
+                    <span>Official Data Verified</span>
                   </div>
                 </div>
               </div>
@@ -378,6 +370,77 @@ export default function Page() {
                 <p className="text-center text-sm text-slate-500 mt-8">
                   💡 Traditional notary fees range from 3% to 5% of estate value. ProofHeir saves you up to 85% on inheritance costs.
                 </p>
+              </div>
+
+              {/* FAQ Section */}
+              <div id="faq" className="max-w-3xl mx-auto mt-20">
+                <h2 className="text-2xl font-bold text-white mb-8 text-center">Frequently Asked Questions</h2>
+                <div className="space-y-4">
+                  {/* FAQ 1 */}
+                  <details className="group bg-slate-800/50 border border-white/10 rounded-xl overflow-hidden">
+                    <summary className="flex items-center justify-between p-5 cursor-pointer hover:bg-slate-700/30 transition-colors">
+                      <span className="font-medium text-white">How does the system know I passed away or lost access?</span>
+                      <svg className="w-5 h-5 text-slate-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </summary>
+                    <div className="px-5 pb-5 text-sm text-slate-400 leading-relaxed">
+                      ProofHeir doesn't "watch" you. The process is <span className="text-white font-medium">on-demand</span>. When the time comes, your designated heir initiates a "Claim". They must provide a cryptographic proof of the event (like a death certificate from a government portal). Our protocol uses <span className="text-amber-400">TLSNotary</span> to verify that this information comes from an official source—without us ever seeing the private data.
+                    </div>
+                  </details>
+
+                  {/* FAQ 2 */}
+                  <details className="group bg-slate-800/50 border border-white/10 rounded-xl overflow-hidden">
+                    <summary className="flex items-center justify-between p-5 cursor-pointer hover:bg-slate-700/30 transition-colors">
+                      <span className="font-medium text-white">Who triggers the claim process?</span>
+                      <svg className="w-5 h-5 text-slate-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </summary>
+                    <div className="px-5 pb-5 text-sm text-slate-400 leading-relaxed">
+                      The <span className="text-white font-medium">heir or claimant</span> you designated is the one who starts the process. They connect their wallet and submit the required verification. If the proof is valid according to the rules you set, the smart contract executes the transfer automatically on the <span className="text-purple-400">Mantle Network</span>.
+                    </div>
+                  </details>
+
+                  {/* FAQ 3 */}
+                  <details className="group bg-slate-800/50 border border-white/10 rounded-xl overflow-hidden">
+                    <summary className="flex items-center justify-between p-5 cursor-pointer hover:bg-slate-700/30 transition-colors">
+                      <span className="font-medium text-white">What is "Secure Smart Delegation" (EIP-7702)?</span>
+                      <svg className="w-5 h-5 text-slate-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </summary>
+                    <div className="px-5 pb-5 text-sm text-slate-400 leading-relaxed">
+                      It's a new Ethereum standard that allows your regular wallet to "borrow" smart contract features. Instead of moving your funds to a risky vault, you simply sign a <span className="text-blue-400">Secure Delegation</span>. This gives our vault permission to move your assets <span className="text-white font-medium">only if a valid ZK-Proof is presented</span>. You keep 100% control and liquidity while you are active.
+                    </div>
+                  </details>
+
+                  {/* FAQ 4 */}
+                  <details className="group bg-slate-800/50 border border-white/10 rounded-xl overflow-hidden">
+                    <summary className="flex items-center justify-between p-5 cursor-pointer hover:bg-slate-700/30 transition-colors">
+                      <span className="font-medium text-white">Is ProofHeir truly non-custodial?</span>
+                      <svg className="w-5 h-5 text-slate-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </summary>
+                    <div className="px-5 pb-5 text-sm text-slate-400 leading-relaxed">
+                      <span className="text-emerald-400 font-medium">Yes.</span> We never hold your private keys or funds. We use <span className="text-blue-400">Privy</span> for seamless wallet authentication in this proof-of-concept because not all wallets natively expose <span className="text-white font-medium">EIP-7702 methods</span> in their JSON-RPC yet. The actual authority to move funds comes from a delegation signed by <span className="text-white font-medium">your wallet</span>. Even if ProofHeir Labs disappeared, your funds remain safe.
+                    </div>
+                  </details>
+
+                  {/* FAQ 5 */}
+                  <details className="group bg-slate-800/50 border border-white/10 rounded-xl overflow-hidden">
+                    <summary className="flex items-center justify-between p-5 cursor-pointer hover:bg-slate-700/30 transition-colors">
+                      <span className="font-medium text-white">What if my heir loses access to their email or identity?</span>
+                      <svg className="w-5 h-5 text-slate-400 group-open:rotate-180 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </summary>
+                    <div className="px-5 pb-5 text-sm text-slate-400 leading-relaxed">
+                      We recommend designating an heir through verifiable identity sources that aren't just an email (such as a wallet address or government-linked ID). In our <span className="text-blue-400">Pro</span> and <span className="text-amber-400">Whale</span> plans, you can designate <span className="text-white font-medium">multiple heirs</span> to ensure that if one recovery path fails, your legacy still has a way home.
+                    </div>
+                  </details>
+                </div>
               </div>
             </div>
           </div>
