@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useId } from 'react'
 import { useTokenBalances, type TokenInfo } from '../hooks/useTokenBalances'
 
 interface TokenSelectorProps {
@@ -20,6 +20,12 @@ export function TokenSelector({
     const [customAddress, setCustomAddress] = useState('')
     const [searchQuery, setSearchQuery] = useState('')
 
+    // Accessibility IDs
+    const customTokenErrorId = useId()
+
+    // Validation state
+    const hasCustomTokenError = !!customAddress && (!customAddress.startsWith('0x') || customAddress.length !== 42)
+
     const toggleToken = (address: string) => {
         if (selectedTokens.includes(address)) {
             onTokensChange(selectedTokens.filter(t => t !== address))
@@ -29,7 +35,7 @@ export function TokenSelector({
     }
 
     const addCustomToken = () => {
-        if (customAddress && customAddress.startsWith('0x') && customAddress.length === 42) {
+        if (customAddress && !hasCustomTokenError) {
             if (!selectedTokens.includes(customAddress)) {
                 onTokensChange([...selectedTokens, customAddress])
             }
@@ -245,22 +251,24 @@ export function TokenSelector({
                         value={customAddress}
                         onChange={(e) => setCustomAddress(e.target.value)}
                         placeholder="0x... token address"
-                        className={`flex-1 p-2.5 bg-slate-800/50 border rounded-lg text-white placeholder-slate-500 font-mono text-xs focus:ring-2 focus:ring-cyan-500 focus:border-transparent ${customAddress && (!customAddress.startsWith('0x') || customAddress.length !== 42)
+                        aria-invalid={hasCustomTokenError}
+                        aria-describedby={hasCustomTokenError ? customTokenErrorId : undefined}
+                        className={`flex-1 p-2.5 bg-slate-800/50 border rounded-lg text-white placeholder-slate-500 font-mono text-xs focus:ring-2 focus:ring-cyan-500 focus:border-transparent ${hasCustomTokenError
                             ? 'border-rose-500/50'
                             : 'border-white/10'
                             }`}
                     />
                     <button
                         onClick={addCustomToken}
-                        disabled={!customAddress || !customAddress.startsWith('0x') || customAddress.length !== 42}
+                        disabled={!customAddress || hasCustomTokenError}
                         aria-label="Add custom token"
                         className="px-4 bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-600 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
                     >
                         Add
                     </button>
                 </div>
-                {customAddress && (!customAddress.startsWith('0x') || customAddress.length !== 42) && (
-                    <p className="text-xs text-rose-400 mt-2">
+                {hasCustomTokenError && (
+                    <p id={customTokenErrorId} role="alert" className="text-xs text-rose-400 mt-2">
                         {!customAddress.startsWith('0x')
                             ? 'Address must start with 0x'
                             : `Address must be 42 characters (${customAddress.length}/42)`}

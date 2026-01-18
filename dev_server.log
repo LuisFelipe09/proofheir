@@ -1,0 +1,12 @@
+
+> nx run web:dev:development --webpack
+
+Using webpack bundler (Next.js 16+ detected)
+   [1m[38;2;173;127;168m▲ Next.js 16.0.10[39m[22m (webpack)
+   - Local:         http://localhost:3000
+   - Network:       http://192.168.0.2:3000
+ [32m[1m✓[22m[39m Starting...
+ [32m[1m✓[22m[39m Ready in 3.2s
+ [37m[1m○[22m[39m Compiling / ...
+ GET / [32m200[39m in 53s[2m (compile: 52s, render: 1103ms)[22m
+ GET / [32m200[39m in 73ms[2m (compile: 10ms, render: 63ms)[22m
